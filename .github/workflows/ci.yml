@@ -36,6 +36,8 @@ jobs:
         with:
           go-version: "1.25"
           cache: true
+      - name: Build binary (for integration tests)
+        run: mkdir -p bin && go build -o bin/ailinter ./cmd/ailinter
       - name: Run tests
         run: go test $(go list ./... | grep -v -E '/(scripts|cmd)/') -v -count=1 -coverprofile=coverage.out -covermode=count
       - name: Check coverage
