@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/ailinter/ailinter/internal/cli"
 	"github.com/ailinter/ailinter/internal/telemetry"
@@ -11,6 +12,14 @@ import (
 )
 
 var version = "0.0.0-dev"
+
+func init() {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		if v := info.Main.Version; v != "" && v != "(devel)" {
+			version = v
+		}
+	}
+}
 
 func main() {
 	telemetry.Version = version
