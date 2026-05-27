@@ -13,8 +13,9 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ailinter/ailinter)](https://goreportcard.com/report/github.com/ailinter/ailinter)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-6e41e2)](https://modelcontextprotocol.io)
-[![CI](https://github.com/ailinter/ailinter/actions/workflows/ci.yml/badge.svg)](https://github.com/ailinter/ailinter/actions)
-[![Release](https://img.shields.io/github/v/release/ailinter/ailinter)](https://github.com/ailinter/ailinter/releases)
+[![Tests](https://img.shields.io/badge/tests-passing-22C55E)](https://github.com/ailinter/ailinter/actions)
+[![Coverage](https://img.shields.io/badge/coverage-85%25-22C55E)]()
+[![Binary](https://img.shields.io/badge/binary-15MB-lightgrey)](https://github.com/ailinter/ailinter/releases)
 
 <p align="center">
   Created by <a href="https://github.com/IvanBern">Ivan Bernikov</a>
@@ -53,14 +54,27 @@ Or download pre-built binaries from [GitHub Releases](https://github.com/ailinte
 # Scan a file
 ailinter check src/main.go
 
-# Initialize a project
+# Interactive setup (configures AI agents, git hooks, VS Code)
 ailinter init
+
+# Non-interactive: configure specific agent
+ailinter init --agent claude --vscode --hook
 
 # Start MCP server
 ailinter mcp
 ```
 
 ### Add to Your AI Assistant
+
+**One command setup:**
+
+```bash
+ailinter init --agent all
+```
+
+Creates MCP configs for OpenCode, Claude Code, Cursor, and GitHub Copilot — plus agent instructions, sub-agent definitions, skill files, and optional git hooks and VS Code integration.
+
+**Manual MCP config:**
 
 ```json
 {
@@ -73,7 +87,7 @@ ailinter mcp
 }
 ```
 
-> Config: OpenCode `opencode.json` · Claude `.claude/mcp.json` · Cursor `.cursor/mcp.json` · VS Code `.vscode/mcp.json`
+> See the [Setup Guide](docs/setup.md) for all options, interactive mode, and agent-specific configurations.
 
 ---
 
@@ -87,6 +101,16 @@ Every file gets a **0–100 score** that tells AI assistants whether it's safe t
 | **60–79** | Proceed with Care | Use small changes, re-check after each edit |
 | **40–59** | Needs Work | Significant issues — refactor incrementally |
 | **0–39** | Stop & Refactor | Refactor BEFORE AI touches this file |
+
+### Vulnerability Tiers
+
+Every file also gets a vulnerability classification:
+
+| Findings | Tier | Meaning |
+|----------|------|---------|
+| **0** | Clean | No vulnerabilities detected |
+| **Warning only** | Monitor | Low-risk patterns — review them |
+| **Alert/Critical** | Remediate | Active vulnerabilities — fix before continuing |
 
 ---
 
