@@ -18,10 +18,10 @@ vendor/
 # Build
 bin/
 dist/
-ailinter
-ailinter.exe
-main
-comprehensive_main
+/ailinter
+/ailinter.exe
+/main
+/comprehensive_main
 
 # Config (local overrides)
 .ailinter.local.toml
