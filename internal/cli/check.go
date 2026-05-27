@@ -6,10 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ailinter/ailinter/internal/analyzer"
 	"github.com/ailinter/ailinter/internal/config"
 	"github.com/ailinter/ailinter/internal/secrets"
+	"github.com/ailinter/ailinter/internal/telemetry"
 	"github.com/ailinter/ailinter/internal/vulnerability"
 
 	"github.com/spf13/cobra"
@@ -96,8 +98,11 @@ Targeted scans:
 }
 
 func executeCheck(target string, opts checkOptions, respectGitignore bool) error {
+	telemetry.RecordCLIInvocation("check")
+
 	info, err := os.Stat(target)
 	if err != nil {
+		telemetry.RecordError("file_access")
 		return fmt.Errorf("cannot access %s: %w", target, err)
 	}
 
@@ -120,6 +125,7 @@ func (opts checkOptions) detectLang(path string) string {
 }
 
 func checkFile(path string, opts checkOptions) error {
+	start := time.Now()
 	resolved, err := resolveSafePath(path)
 	if err != nil {
 		return err
@@ -127,30 +133,42 @@ func checkFile(path string, opts checkOptions) error {
 
 	data, err := os.ReadFile(resolved)
 	if err != nil {
+		telemetry.RecordError("file_read")
 		return fmt.Errorf("failed to read %s: %w", resolved, err)
 	}
 
 	if isBinary(data) {
+		telemetry.RecordError("binary_file")
 		return fmt.Errorf("cannot analyze binary file: %s", resolved)
 	}
 
 	if opts.secretsOnly {
 		scanAndWriteSecrets(resolved, data, opts.format)
+		telemetry.RecordDuration("check_file", "", time.Since(start).Seconds())
 		return nil
 	}
 	if opts.vulnerabilitiesOnly {
 		vulnScanner := vulnerability.NewScanner()
 		vulnFindings := vulnScanner.Scan(string(data), resolved)
 		writeVulnerabilities(opts.format, resolved, vulnFindings)
+		telemetry.RecordDuration("check_file", "", time.Since(start).Seconds())
 		return nil
 	}
 
 	lang := opts.detectLang(resolved)
+	ext := filepath.Ext(resolved)
 	thresholds := config.LoadProjectThresholds(resolved, lang)
 	result := analyzer.Analyze(resolved, string(data), lang, thresholds)
 
+	telemetry.RecordFileAnalyzed(lang, ext)
+	telemetry.RecordQualityScore(lang, result.Score)
+	for _, s := range result.Smells {
+		telemetry.RecordSmellsDetected(s.Name, lang, 1)
+	}
+
 	if opts.format == FormatJSON {
 		writeCombinedJSON(result, data, resolved, opts.noSecrets, opts.noVulnerabilities)
+		telemetry.RecordDuration("check_file", lang, time.Since(start).Seconds())
 		return nil
 	}
 
@@ -164,6 +182,7 @@ func checkFile(path string, opts checkOptions) error {
 		writeVulnerabilities(opts.format, resolved, vulnFindings)
 	}
 
+	telemetry.RecordDuration("check_file", lang, time.Since(start).Seconds())
 	return nil
 }
 
@@ -292,9 +311,11 @@ func (ctx *walkContext) writeResults() {
 func scanAndWriteSecrets(path string, data []byte, format FormatMode) {
 	scanner, err := secrets.NewScanner()
 	if err != nil {
+		telemetry.RecordError("secret_scanner_init")
 		return
 	}
 	findings := scanner.ScanBytes(data, path)
+	telemetry.RecordSecretsDetected("", "", filepath.Ext(path), len(findings))
 	if format == FormatJSON {
 		if len(findings) > 0 {
 			enc := json.NewEncoder(os.Stdout)

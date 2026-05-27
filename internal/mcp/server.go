@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ailinter/ailinter/internal/analyzer"
 	"github.com/ailinter/ailinter/internal/config"
 	"github.com/ailinter/ailinter/internal/refactoring"
 	"github.com/ailinter/ailinter/internal/secrets"
+	"github.com/ailinter/ailinter/internal/telemetry"
 	"github.com/ailinter/ailinter/internal/vulnerability"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -91,8 +93,15 @@ func Serve(version string) error {
 }
 
 func handleAnalyzeCode(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+	telemetry.RecordMCPToolCall("analyze_code")
+	defer func() {
+		telemetry.RecordDuration("analyze_code", "", time.Since(start).Seconds())
+	}()
+
 	args, ok := req.Params.Arguments.(map[string]interface{})
 	if !ok {
+		telemetry.RecordError("mcp_invalid_args")
 		return mcp.NewToolResultError("invalid arguments"), nil
 	}
 	filePath, ok := args["file_path"].(string)
@@ -102,15 +111,18 @@ func handleAnalyzeCode(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 
 	resolvedPath, err := resolveAndValidatePath(filePath)
 	if err != nil {
+		telemetry.RecordError("mcp_path_validation")
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	data, err := os.ReadFile(resolvedPath)
 	if err != nil {
+		telemetry.RecordError("mcp_file_read")
 		return mcp.NewToolResultError(fmt.Sprintf("failed to read file: %v", err)), nil
 	}
 
 	if isBinaryContent(data) {
+		telemetry.RecordError("mcp_binary_file")
 		return mcp.NewToolResultError("cannot analyze binary file"), nil
 	}
 
@@ -122,6 +134,12 @@ func handleAnalyzeCode(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 
 	thresholds := config.LoadProjectThresholds(resolvedPath, lang)
 	result := analyzer.Analyze(resolvedPath, string(data), lang, thresholds)
+
+	telemetry.RecordFileAnalyzed(lang, ext)
+	telemetry.RecordQualityScore(lang, result.Score)
+	for _, s := range result.Smells {
+		telemetry.RecordSmellsDetected(s.Name, lang, 1)
+	}
 
 	vulnScanner := vulnerability.NewScanner()
 	vulnFindings := vulnScanner.Scan(string(data), resolvedPath)
@@ -138,8 +156,15 @@ func handleAnalyzeCode(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 }
 
 func handleScanForSecrets(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+	telemetry.RecordMCPToolCall("scan_for_secrets")
+	defer func() {
+		telemetry.RecordDuration("scan_for_secrets", "", time.Since(start).Seconds())
+	}()
+
 	args, ok := req.Params.Arguments.(map[string]interface{})
 	if !ok {
+		telemetry.RecordError("mcp_invalid_args")
 		return mcp.NewToolResultError("invalid arguments"), nil
 	}
 	content, ok := args["content"].(string)
@@ -149,16 +174,25 @@ func handleScanForSecrets(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 
 	scanner, err := secrets.NewScanner()
 	if err != nil {
+		telemetry.RecordError("mcp_secret_scanner_init")
 		return mcp.NewToolResultError(fmt.Sprintf("secret scanner init failed: %v", err)), nil
 	}
 
 	findings := scanner.ScanString(content, "<inline>")
+	telemetry.RecordSecretsDetected("", "", "", len(findings))
 	return mcp.NewToolResultStructuredOnly(findings), nil
 }
 
 func handleGetRefactoringStrategy(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+	telemetry.RecordMCPToolCall("get_refactoring_strategy")
+	defer func() {
+		telemetry.RecordDuration("get_refactoring_strategy", "", time.Since(start).Seconds())
+	}()
+
 	args, ok := req.Params.Arguments.(map[string]interface{})
 	if !ok {
+		telemetry.RecordError("mcp_invalid_args")
 		return mcp.NewToolResultError("invalid arguments"), nil
 	}
 	smellName, ok := args["smell_name"].(string)
@@ -176,8 +210,15 @@ func handleGetRefactoringStrategy(ctx context.Context, req mcp.CallToolRequest) 
 }
 
 func handleAssessFile(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+	telemetry.RecordMCPToolCall("assess_file")
+	defer func() {
+		telemetry.RecordDuration("assess_file", "", time.Since(start).Seconds())
+	}()
+
 	args, ok := req.Params.Arguments.(map[string]interface{})
 	if !ok {
+		telemetry.RecordError("mcp_invalid_args")
 		return mcp.NewToolResultError("invalid arguments"), nil
 	}
 	filePath, ok := args["file_path"].(string)
@@ -187,15 +228,18 @@ func handleAssessFile(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallTo
 
 	resolvedPath, err := resolveAndValidatePath(filePath)
 	if err != nil {
+		telemetry.RecordError("mcp_path_validation")
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
 	data, err := os.ReadFile(resolvedPath)
 	if err != nil {
+		telemetry.RecordError("mcp_file_read")
 		return mcp.NewToolResultError(fmt.Sprintf("failed to read file: %v", err)), nil
 	}
 
 	if isBinaryContent(data) {
+		telemetry.RecordError("mcp_binary_file")
 		return mcp.NewToolResultError("cannot analyze binary file"), nil
 	}
 
@@ -207,6 +251,9 @@ func handleAssessFile(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallTo
 
 	thresholds := config.LoadProjectThresholds(resolvedPath, lang)
 	result := analyzer.Analyze(resolvedPath, string(data), lang, thresholds)
+
+	telemetry.RecordFileAnalyzed(lang, ext)
+	telemetry.RecordQualityScore(lang, result.Score)
 
 	return mcp.NewToolResultText(buildAssessmentSummary(result)), nil
 }
@@ -238,8 +285,15 @@ func assessmentRecommendation(label string) string {
 }
 
 func handleSetConfig(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+	telemetry.RecordMCPToolCall("set_config")
+	defer func() {
+		telemetry.RecordDuration("set_config", "", time.Since(start).Seconds())
+	}()
+
 	args, ok := req.Params.Arguments.(map[string]interface{})
 	if !ok {
+		telemetry.RecordError("mcp_invalid_args")
 		return mcp.NewToolResultError("invalid arguments"), nil
 	}
 	key, _ := args["key"].(string)
@@ -249,20 +303,34 @@ func handleSetConfig(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	}
 	cfg, err := config.SetAndGet(key, value)
 	if err != nil {
+		telemetry.RecordError("mcp_set_config")
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	return mcp.NewToolResultStructured(cfg, fmt.Sprintf("Configuration updated:\n%s", mustMarshalIndent(cfg))), nil
 }
 
 func handleGetConfig(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+	telemetry.RecordMCPToolCall("get_config")
+	defer func() {
+		telemetry.RecordDuration("get_config", "", time.Since(start).Seconds())
+	}()
+
 	cfg, err := config.GetConfig()
 	if err != nil {
+		telemetry.RecordError("mcp_get_config")
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	return mcp.NewToolResultStructured(cfg, fmt.Sprintf("Current configuration:\n%s", mustMarshalIndent(cfg))), nil
 }
 
 func handleListHotspots(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+	telemetry.RecordMCPToolCall("list_hotspots")
+	defer func() {
+		telemetry.RecordDuration("list_hotspots", "", time.Since(start).Seconds())
+	}()
+
 	args, _ := req.Params.Arguments.(map[string]interface{})
 	repoPath, _ := args["repo_path"].(string)
 	if repoPath == "" {
@@ -275,6 +343,7 @@ func handleListHotspots(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 
 	result := analyzer.AnalyzeGitHotspots(repoPath, maxCommits)
 	if result.Error != "" {
+		telemetry.RecordError("mcp_list_hotspots")
 		return mcp.NewToolResultError(result.Error), nil
 	}
 

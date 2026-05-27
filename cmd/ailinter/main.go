@@ -1,16 +1,24 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/ailinter/ailinter/internal/cli"
+	"github.com/ailinter/ailinter/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 
 var version = "0.5.0-dev"
 
 func main() {
+	telemetry.Version = version
+	telemetry.Init(context.Background())
+	defer telemetry.Shutdown(context.Background())
+
+	telemetry.RecordInstallation()
+
 	root := &cobra.Command{
 		Use:   "ailinter",
 		Short: "ailinter — AI Linter & Code Quality for AI-Assisted Development",
@@ -30,6 +38,7 @@ Run as a CLI tool or an MCP server for AI assistants.`,
 	root.AddCommand(cli.MCPCommand(version))
 	root.AddCommand(cli.InitCommand())
 	root.AddCommand(rulesCommand())
+	root.AddCommand(telemetryCommand())
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -83,6 +92,35 @@ func isValidLanguage(lang string) bool {
 		return true
 	}
 	return false
+}
+
+func telemetryCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "telemetry",
+		Short: "Show telemetry collection details",
+		Long:  "ailinter collects anonymous usage statistics by default. No source code, file paths, or PII is ever collected.",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("Metrics collected (all anonymous):")
+			fmt.Println()
+			fmt.Println("  Metric              | Tags")
+			fmt.Println("  ------------------- | ----")
+			fmt.Println("  cli.invocations     | command, os, arch, version")
+			fmt.Println("  mcp.tool_calls      | tool, version")
+			fmt.Println("  files.analyzed      | language, extension, version")
+			fmt.Println("  installations       | version")
+			fmt.Println("  quality.score       | language (histogram)")
+			fmt.Println("  smells.detected     | smell_type, language")
+			fmt.Println("  secrets.detected    | category, severity, file_ext")
+			fmt.Println("  duration.seconds    | operation, language (histogram)")
+			fmt.Println("  errors              | error_type")
+			fmt.Println()
+			fmt.Println("Opt out: AILINTER_NO_TELEMETRY=1")
+			fmt.Println()
+			fmt.Println("NOT collected: source code, file paths, IPs, hostnames, env vars, raw secrets, git metadata.")
+			fmt.Println()
+		},
+	}
+	return cmd
 }
 
 func printLanguageRules(lang string) {
