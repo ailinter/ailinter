@@ -9,11 +9,14 @@ import (
 )
 
 func InitCommand() *cobra.Command {
-	var skipAgents bool
-	var withVSCode bool
-	var agentFlag string
-	var setupHook bool
-	var profileFlag string
+	var (
+		skipAgents  bool
+		withVSCode  bool
+		agentFlag   string
+		setupHook   bool
+		profileFlag string
+	)
+	opts := &setupOpts{}
 
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -45,13 +48,18 @@ Per-agent files (via --agent or interactive selection):
 			}
 
 			hasAnyFlag := skipAgents || withVSCode || agentFlag != "" || setupHook ||
-				cmd.Flags().Changed("profile") || cmd.Flags().Changed("format")
+				cmd.Flags().Changed("profile")
 
 			if !hasAnyFlag && isInteractive() {
 				return runInteractiveSetup(cwd, false, false)
 			}
 
-			return runNonInteractiveSetup(cwd, skipAgents, withVSCode, agentFlag, setupHook, profileFlag)
+			opts.skipAgents = skipAgents
+			opts.withVSCode = withVSCode
+			opts.agentFlag = agentFlag
+			opts.setupHook = setupHook
+			opts.profileFlag = profileFlag
+			return runNonInteractiveSetup(cwd, opts)
 		},
 	}
 
@@ -63,29 +71,50 @@ Per-agent files (via --agent or interactive selection):
 	return cmd
 }
 
-func runNonInteractiveSetup(cwd string, skipAgents, withVSCode bool, agentFlag string, setupHook bool, profileFlag string) error {
+type setupOpts struct {
+	skipAgents  bool
+	withVSCode  bool
+	agentFlag   string
+	setupHook   bool
+	profileFlag string
+}
+
+func runNonInteractiveSetup(cwd string, opts *setupOpts) error {
 	result := &setupResult{}
 
-	writeConfig(cwd, profileFlag, result)
-	writeAgentsMD(cwd, skipAgents, result)
+	writeConfig(cwd, opts.profileFlag, result)
+	writeAgentsMD(cwd, opts.skipAgents, result)
 
-	switch strings.ToLower(agentFlag) {
-	case "all":
-		for _, agent := range allAgentNames() {
-			writeAgentFiles(cwd, agent, result)
-		}
-	case "opencode", "claude", "cursor", "copilot":
-		writeAgentFiles(cwd, agentFlag, result)
-	}
+	writeAgentSetups(cwd, opts.agentFlag, result)
 
-	if withVSCode {
+	if opts.withVSCode {
 		writeVSCodeFiles(cwd, result)
 	}
-	if setupHook {
+	if opts.setupHook {
 		writeGitHook(cwd, result)
 	}
 
 	printResult(result)
 	fmt.Println("\nailinter initialized! Run 'ailinter check .' to analyze your codebase.")
 	return nil
+}
+
+func writeAgentSetups(cwd, agentFlag string, result *setupResult) {
+	agent := strings.ToLower(agentFlag)
+	if agent == "all" {
+		for _, a := range allAgents {
+			writeAgentFiles(cwd, a, result)
+		}
+		return
+	}
+	if kind, ok := parseAgentName(agent); ok {
+		writeAgentFiles(cwd, kind, result)
+	}
+}
+
+func parseAgentName(name string) (agentKind, bool) {
+	if canonical, ok := agentAliases[name]; ok {
+		return canonical, true
+	}
+	return "", false
 }

@@ -10,13 +10,6 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-type agentSetup struct {
-	name     string
-	dir      string
-	files    map[string]string
-	postHook func(cwd string) string
-}
-
 type thresholdProfile struct {
 	name   string
 	config string
@@ -104,7 +97,50 @@ func selectProfile(scanner *bufio.Scanner) string {
 	}
 }
 
-func selectAgents(scanner *bufio.Scanner) []string {
+type agentKind string
+
+const (
+	agentOpenCode agentKind = "opencode"
+	agentClaude   agentKind = "claude"
+	agentCursor   agentKind = "cursor"
+	agentCopilot  agentKind = "copilot"
+)
+
+var allAgents = []agentKind{agentOpenCode, agentClaude, agentCursor, agentCopilot}
+
+func allAgentNames() []string {
+	return []string{"opencode", "claude", "cursor", "copilot"}
+}
+
+var agentAliases = map[string]agentKind{
+	"opencode":    agentOpenCode,
+	"open":        agentOpenCode,
+	"oc":          agentOpenCode,
+	"claude":      agentClaude,
+	"claude-code": agentClaude,
+	"cc":          agentClaude,
+	"cursor":      agentCursor,
+	"cur":         agentCursor,
+	"copilot":     agentCopilot,
+	"github":      agentCopilot,
+	"gh":          agentCopilot,
+	"cp":          agentCopilot,
+}
+
+func parseAgentInput(input string) []agentKind {
+	seen := make(map[agentKind]bool)
+	var result []agentKind
+	for _, name := range strings.Split(input, ",") {
+		name = strings.TrimSpace(strings.ToLower(name))
+		if canonical, ok := agentAliases[name]; ok && !seen[canonical] {
+			seen[canonical] = true
+			result = append(result, canonical)
+		}
+	}
+	return result
+}
+
+func selectAgents(scanner *bufio.Scanner) []agentKind {
 	fmt.Println()
 	fmt.Println("Select AI agents to configure (comma-separated):")
 	fmt.Println("  opencode  — OpenCode subagent + skill + MCP config")
@@ -115,44 +151,19 @@ func selectAgents(scanner *bufio.Scanner) []string {
 	fmt.Print("Agents (all): ")
 
 	if !scanner.Scan() {
-		return allAgentNames()
+		return allAgents
 	}
 	input := strings.TrimSpace(scanner.Text())
 	if input == "" || strings.ToLower(input) == "all" {
-		return allAgentNames()
+		return allAgents
 	}
 
-	selected := make(map[string]bool)
-	for _, name := range strings.Split(input, ",") {
-		name = strings.TrimSpace(strings.ToLower(name))
-		switch name {
-		case "opencode", "open", "oc":
-			selected["opencode"] = true
-		case "claude", "claude-code", "cc":
-			selected["claude"] = true
-		case "cursor", "cur":
-			selected["cursor"] = true
-		case "copilot", "github", "gh", "cp":
-			selected["copilot"] = true
-		}
-	}
-
+	selected := parseAgentInput(input)
 	if len(selected) == 0 {
 		fmt.Println("No valid agents selected — using 'all'.")
-		return allAgentNames()
+		return allAgents
 	}
-
-	var result []string
-	for _, name := range []string{"opencode", "claude", "cursor", "copilot"} {
-		if selected[name] {
-			result = append(result, name)
-		}
-	}
-	return result
-}
-
-func allAgentNames() []string {
-	return []string{"opencode", "claude", "cursor", "copilot"}
+	return selected
 }
 
 func askConfirm(scanner *bufio.Scanner, prompt string) bool {
@@ -195,7 +206,15 @@ func writeAgentsMD(cwd string, skip bool, result *setupResult) {
 	result.created = append(result.created, "AGENTS.md")
 }
 
-func writeAgentFiles(cwd, agent string, result *setupResult) {
+func relPath(cwd, path string) string {
+	r, err := filepath.Rel(cwd, path)
+	if err != nil {
+		return path
+	}
+	return r
+}
+
+func writeAgentFiles(cwd string, agent agentKind, result *setupResult) {
 	defs := getAgentDefs(cwd, agent)
 	for _, def := range defs {
 		dir := filepath.Dir(def.path)
@@ -203,11 +222,11 @@ func writeAgentFiles(cwd, agent string, result *setupResult) {
 			os.MkdirAll(dir, 0755)
 		}
 		if _, err := os.Stat(def.path); err == nil {
-			result.skipped = append(result.skipped, rel(cwd, def.path))
+			result.skipped = append(result.skipped, relPath(cwd, def.path))
 			continue
 		}
 		os.WriteFile(def.path, []byte(def.content), 0644)
-		result.created = append(result.created, rel(cwd, def.path))
+		result.created = append(result.created, relPath(cwd, def.path))
 	}
 }
 
@@ -216,31 +235,30 @@ type fileDef struct {
 	content string
 }
 
-func getAgentDefs(cwd, agent string) []fileDef {
-	var defs []fileDef
+func getAgentDefs(cwd string, agent agentKind) []fileDef {
 	switch agent {
-	case "opencode":
-		defs = []fileDef{
+	case agentOpenCode:
+		return []fileDef{
 			{filepath.Join(cwd, "opencode.json"), opencodeMCPConfig},
 			{filepath.Join(cwd, ".opencode", "agent", "ailinter.md"), opencodeAgentConfig},
 			{filepath.Join(cwd, ".opencode", "skills", "ailinter", "SKILL.md"), opencodeSkill},
 		}
-	case "claude":
-		defs = []fileDef{
+	case agentClaude:
+		return []fileDef{
 			{filepath.Join(cwd, ".claude", "settings.json"), claudeMCPConfig},
 			{filepath.Join(cwd, "CLAUDE.md"), claudeInstructions},
 		}
-	case "cursor":
-		defs = []fileDef{
+	case agentCursor:
+		return []fileDef{
 			{filepath.Join(cwd, ".cursor", "mcp.json"), cursorMCPConfig},
 			{filepath.Join(cwd, ".cursor", "rules", "ailinter.mdc"), cursorRules},
 		}
-	case "copilot":
-		defs = []fileDef{
+	case agentCopilot:
+		return []fileDef{
 			{filepath.Join(cwd, ".github", "copilot-instructions.md"), copilotInstructions},
 		}
 	}
-	return defs
+	return nil
 }
 
 func writeVSCodeFiles(cwd string, result *setupResult) {
@@ -249,26 +267,26 @@ func writeVSCodeFiles(cwd string, result *setupResult) {
 
 	tasksPath := filepath.Join(vsDir, "tasks.json")
 	if _, err := os.Stat(tasksPath); err == nil {
-		result.skipped = append(result.skipped, rel(cwd, tasksPath))
+		result.skipped = append(result.skipped, relPath(cwd, tasksPath))
 	} else {
 		os.WriteFile(tasksPath, []byte(defaultVSCodeTasks), 0644)
-		result.created = append(result.created, rel(cwd, tasksPath))
+		result.created = append(result.created, relPath(cwd, tasksPath))
 	}
 
 	settingsPath := filepath.Join(vsDir, "settings.json")
 	if _, err := os.Stat(settingsPath); err == nil {
-		result.skipped = append(result.skipped, rel(cwd, settingsPath))
+		result.skipped = append(result.skipped, relPath(cwd, settingsPath))
 	} else {
 		os.WriteFile(settingsPath, []byte(vscodeSettings), 0644)
-		result.created = append(result.created, rel(cwd, settingsPath))
+		result.created = append(result.created, relPath(cwd, settingsPath))
 	}
 
 	extPath := filepath.Join(vsDir, "extensions.json")
 	if _, err := os.Stat(extPath); err == nil {
-		result.skipped = append(result.skipped, rel(cwd, extPath))
+		result.skipped = append(result.skipped, relPath(cwd, extPath))
 	} else {
 		os.WriteFile(extPath, []byte(vscodeExtensions), 0644)
-		result.created = append(result.created, rel(cwd, extPath))
+		result.created = append(result.created, relPath(cwd, extPath))
 	}
 }
 
@@ -278,37 +296,29 @@ func writeGitHook(cwd string, result *setupResult) {
 
 	hookPath := filepath.Join(githooksDir, "pre-commit")
 	if _, err := os.Stat(hookPath); err == nil {
-		result.skipped = append(result.skipped, rel(cwd, hookPath))
+		result.skipped = append(result.skipped, relPath(cwd, hookPath))
 		return
 	}
 	os.WriteFile(hookPath, []byte(gitPreCommitHook), 0755)
-	result.created = append(result.created, rel(cwd, hookPath))
+	result.created = append(result.created, relPath(cwd, hookPath))
 
-	gitignorePath := filepath.Join(cwd, ".gitignore")
-	hasHookIgnore := false
-	if data, err := os.ReadFile(gitignorePath); err == nil {
-		hasHookIgnore = strings.Contains(string(data), ".githooks")
-	}
-
-	if !hasHookIgnore {
-		if _, err := os.Stat(gitignorePath); err == nil {
-			f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0644)
-			if err == nil {
-				f.WriteString("\n# ailinter hooks\n.githooks/\n")
-				f.Close()
-			}
-		} else {
-			os.WriteFile(gitignorePath, []byte("# ailinter hooks\n.githooks/\n"), 0644)
-		}
-	}
+	updateGitignoreForHooks(cwd)
 }
 
-func rel(cwd, path string) string {
-	r, err := filepath.Rel(cwd, path)
-	if err != nil {
-		return path
+func updateGitignoreForHooks(cwd string) {
+	gitignorePath := filepath.Join(cwd, ".gitignore")
+	if data, err := os.ReadFile(gitignorePath); err == nil {
+		if strings.Contains(string(data), ".githooks") {
+			return
+		}
+		f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0644)
+		if err == nil {
+			f.WriteString("\n# ailinter hooks\n.githooks/\n")
+			f.Close()
+		}
+	} else {
+		os.WriteFile(gitignorePath, []byte("# ailinter hooks\n.githooks/\n"), 0644)
 	}
-	return r
 }
 
 func printResult(result *setupResult) {
