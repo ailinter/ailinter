@@ -1,90 +1,85 @@
 # Changelog
 
-## [Unreleased] — v0.5.0-dev
+## [v0.8.1] — 2026-05-28
 
-### Added (Phase 1 — Complete)
+### Added
+- **Anonymous telemetry** via OpenTelemetry OTLP/HTTP
+  - 9 metric instruments: CLI invocations, MCP tool calls, files analyzed, quality scores, smells/secrets detected, duration, errors, installations
+  - Cloudflare Worker → R2 → DuckDB backend
+  - Opt-out via `AILINTER_NO_TELEMETRY=1` or `go build -tags no_telemetry`
+  - `ailinter telemetry` command shows what is collected
+- **Proper versioning**: `debug.ReadBuildInfo()` embeds version for `go install @v0.8.1`, ldflags for release builds
+- **Pre-built binaries** on GitHub Releases for all platforms
+- **Homebrew tap**: `brew install ailinter/ailinter/ailinter`
+
+### Changed
+- Version from `0.5.0-dev` → `v0.8.1`
+- Go module directive: `go 1.25`
+
+## [v0.7.3] — 2026-05-27
+
+### Added
+- **Vulnerability scanner**: 37 security patterns across 8 languages, 6 categories (injection, XSS, deserialization, weak crypto, XXE, path traversal)
+- Most-vulnerable identification tracking per language
+- `--no-vulnerabilities` flag, MCP vuln data integration
+
+### Fixed
+- C# Process.Start regression
+- Docstring cleanup, workflow fixes, JS SQLi pattern, Java SHA-1 detection
+
+## [v0.7.2] — 2026-05-27
+
+### Fixed
+- Bug fixes: docstrings, workflow, JavaScript SQLi, Java SHA-1
+
+## [v0.7.0] — 2026-05-26
+
+### Added
+- **Vulnerability scanner**: 25 security patterns, 6 categories
+- `--no-vulnerabilities` flag
+- MCP vulnerability data in `analyze_code` output
+
+## [v0.6.0] — 2026-05-25
+
+### Added
+- **Vulnerability scanner**: initial security pattern detection
+- **MCP server improvements**: error handling, path validation
+
+## [v0.5.0] — 2026-05-24
+
+### Added
 
 #### Code Quality Radar (17 detectors)
-- **Deep nesting detection** — brace-counting with warning/alert thresholds
-- **Brain Method detection** — per-language function length analysis (Go, C++, Java, Rust, Ruby, Swift, Kotlin, Python)
-- **File bloat detection** — God Class risk with 3-tier severity (warn/alert/critical)
-- **Bumpy Road detection** — multiple deeply-nested blocks segmentation
-- **Complex conditional detection** — `&&`/`||` branch counting in if/while
-- **Long parameter list detection** — function signature parameter counting
-- **Cyclomatic complexity** — per-function branch counting (CC >= 9 warns)
-- **Message chain detection** — Law of Demeter `a.b().c()` patterns
-- **Primitive obsession detection** — primitive-type overload in signatures
-- **Lazy element detection** — functions shorter than 3 lines
-- **Paragraph of code detection** — consecutive non-blank lines > 15
-- **Code duplication detection** — SHA256-normalized fingerprints with similarity scoring
-- **Cohesion analysis** — shared-type analysis with low cohesion detection
-- **Excessive comments detection** — comment-to-code ratio > 30%
-- **Global data detection** — mutable top-level declarations
-- **Long scope variable detection** — variables declared far from last use
-- **Long switch detection** — case count threshold analysis
+- Deep nesting, brain method, file bloat, bumpy road detection
+- Complex conditional, long parameter list, cyclomatic complexity
+- Message chain, primitive obsession, lazy element, paragraph of code
+- Code duplication, cohesion analysis, excessive comments
+- Global data, long scope variable, long switch detection
 
-#### Secret Scanning (Tier 1)
-- **269 detection rules** from betterleaks (evolved gitleaks engine) — 2× broader coverage than gitleaks 150-rule default
-- Embedded at compile time, falls back to gitleaks default if config parsing fails
-- 100+ providers covered: cloud, AI/ML, dev platforms, payments, comms, databases, private keys
-- New rule types: Cerebras, DeepSeek, Perplexity, XAI, GitHub fine-grained PAT, Cursor, Databricks, Vercel, etc.
-- Supporting config file scanning: `.env`, `.env.*`, `.properties`, `.ini`, `.cfg`, `.conf`, `Dockerfile`, `Makefile`
-- Multi-provider coverage: AWS, GCP, Azure, GitHub, GitLab, Stripe, Slack, etc.
-- Entropy-based severity classification (critical >= 4.5, alert >= 3.5, warning < 3.5)
-- Secret redaction in output (first 4 + last 4 characters)
-- AI prompt injection with `os.Getenv` remediation guidance
-- Custom rule set support via `NewScannerConfig(tomlString)` in Go API
+#### Secret Scanning
+- 269 detection rules (betterleaks engine)
+- 100+ providers: cloud, AI/ML, dev platforms, payments, databases
+- Config file scanning (`.env`, `.toml`, `Dockerfile`, etc.)
+- Entropy-based severity classification
+- Secret redaction in output
 
 #### Refactoring Guide
-- **8 embedded patterns**: deep_nesting, brain_method, bumpy_road, complex_conditional, god_class, long_parameter_list, primitive_obsession, duplicated_code
+- 8 embedded patterns: deep_nesting, brain_method, bumpy_road, etc.
 - Step-by-step instructions with before/after examples
 - Pattern lookup by smell name via MCP tool
 
 #### MCP Server (7 tools)
-- `analyze_code` — Full structural analysis with quality score
-- `scan_for_secrets` — Gitleaks-based secret detection
-- `get_refactoring_strategy` — Pattern lookup by smell name
-- `assess_file` — Quick Go Ahead (95+) / Proceed with Care (75-94) / Stop & Refactor (<75) classification
-- `set_config` — Persistent config management (8 keys)
-- `get_config` — View current configuration
-- `list_hotspots` — Git log analysis for frequently-changed low-quality files
+- `analyze_code`, `scan_for_secrets`, `get_refactoring_strategy`, `assess_file`
+- `set_config`, `get_config`, `list_hotspots`
 
 #### CLI Commands
-- `ailinter check <file|dir>` — Analyze files with multiple output formats (human, json, markdown, problems)
-- `ailinter mcp` — Start MCP server on stdio
-- `ailinter init` — Bootstrap project (.ailinter.toml, AGENTS.md, optional .vscode/tasks.json)
-- `ailinter rules list` — Display default language thresholds
+- `ailinter check`, `ailinter mcp`, `ailinter init`, `ailinter rules list`
 
 #### Language Support
-- **12 languages** with custom thresholds: Go, Python, JavaScript, TypeScript, C/C++, Java, Rust, Ruby, Swift, Kotlin, C#
-- **33 source file extensions** for directory scanning
-- Per-language thresholds (nesting depth, cyclomatic complexity, function LOC, file LOC, max arguments)
+- 12 languages with custom thresholds
+- 33 source file extensions for directory scanning
 
 #### Infrastructure
 - Cross-platform builds: darwin/amd64, darwin/arm64, linux/amd64, linux/arm64, windows/amd64
 - Makefile with build, test, coverage, benchmark, release targets
-- 15 test files with 141 test functions + 2 benchmarks
-- 13 test fixture files across 7 scenarios
-
-### Fixed (v0.5.0-dev)
-
-#### Function Detection
-- **Python**: Now correctly detects functions using indentation-based boundaries (previously used Go's brace detector, missing all Python functions). Supports `def`, `async def`, `@decorators`, class methods, nested functions, and auto-detection of tabs vs spaces.
-- **Multiline signatures**: All brace-based detectors (Go, C++, Java, Rust, Swift, Kotlin) now correctly handle function signatures where the opening `{` is on a different line from the function keyword.
-- **Java**: Added support for annotated methods (`@GetMapping`, any `@` prefix), generic return types (`List<User>`), `default` methods, `synchronized`, and proper word-boundary matching (fixed `strings.Contains` false positives that could match comment text).
-- **Kotlin**: Added support for `suspend`, `inline`, `operator`, `infix`, `tailrec`, `external`, and annotation-stripped function definitions.
-- **C++**: Added support for destructors (`~ClassName`), operator overloads (`operator==`, `operator+`), and constructor initializer lists.
-
-#### Scoring
-- Action-oriented tiers: Go Ahead (95+), Proceed with Care (75-94), Stop & Refactor (<75)
-- Labels are direct instructions LLMs follow: "Go Ahead" = safe, "Proceed with Care" = guarded, "Stop & Refactor" = hard constraint
-
-### Planned (v0.6.0)
-
-- SAST lite: SQL injection, XSS, weak crypto, insecure permissions detection
-- IaC security: 10 rules for Terraform/CF/Docker/K8s misconfigurations
-- Dependency SCA: hallucinated package detection + OSV.dev CVE lookup
-- OWASP Top 10, CWE, NIST SSDF classification on all security findings
-- AI hallucination heuristics for secrets (unknown-format detection, multi-file correlation)
-- Pre-commit hook installation
-- Diff-aware analysis (analyze changed files vs base branch)
+- CI: lint, test (80% coverage gate), build, cross-build, benchmark

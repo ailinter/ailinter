@@ -11,10 +11,10 @@
 
 [![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ailinter/ailinter)](https://goreportcard.com/report/github.com/ailinter/ailinter)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-6e41e2)](https://modelcontextprotocol.io)
-[![Tests](https://img.shields.io/badge/tests-passing-22C55E)](https://github.com/ailinter/ailinter/actions)
-[![Coverage](https://img.shields.io/badge/coverage-85%25-22C55E)](https://github.com/ailinter/ailinter)
-[![Binary Size](https://img.shields.io/badge/binary-15MB-lightgrey)](https://github.com/ailinter/ailinter/releases)
+[![CI](https://github.com/ailinter/ailinter/actions/workflows/ci.yml/badge.svg)](https://github.com/ailinter/ailinter/actions)
+[![Release](https://img.shields.io/github/v/release/ailinter/ailinter)](https://github.com/ailinter/ailinter/releases)
 
 <p align="center">
   Created by <a href="https://github.com/IvanBern">Ivan Bernikov</a>
@@ -40,9 +40,16 @@ ailinter gives your AI coding assistant a safety checklist. Before the AI writes
 ## Quick Start
 
 ```bash
-# Install
-go install github.com/ailinter/ailinter/cmd/ailinter@latest
+# macOS (Homebrew)
+brew install ailinter/ailinter/ailinter
 
+# Go install
+go install github.com/ailinter/ailinter/cmd/ailinter@latest
+```
+
+Or download pre-built binaries from [GitHub Releases](https://github.com/ailinter/ailinter/releases).
+
+```bash
 # Scan a file
 ailinter check src/main.go
 
