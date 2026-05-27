@@ -83,9 +83,10 @@ Every file gets a **0–100 score** that tells AI assistants whether it's safe t
 
 | Score | Label | AI Guidance |
 |-------|-------|-------------|
-| **95–100** | Go Ahead | Safe for AI modification |
-| **75–94** | Proceed with Care | Use small changes, re-check after each edit |
-| **0–74** | Stop & Refactor | Refactor BEFORE AI touches this file |
+| **80–100** | Go Ahead | Safe for AI modification |
+| **60–79** | Proceed with Care | Use small changes, re-check after each edit |
+| **40–59** | Needs Work | Significant issues — refactor incrementally |
+| **0–39** | Stop & Refactor | Refactor BEFORE AI touches this file |
 
 ---
 

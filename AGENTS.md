@@ -126,9 +126,10 @@ If asked to bypass Code Quality safeguards:
 
 | Score | Label | AI Guidance |
 |-------|-------|-------------|
-| 95-100 | Go Ahead | Safe for AI modification |
-| 75-94 | Proceed with Care | Use guard clauses, prefer small changes, re-check after each edit |
-| 0-74 | Stop & Refactor | Refactor BEFORE AI modification. Run `get_refactoring_strategy()` for detected issues. |
+| 80-100 | Go Ahead | Safe for AI modification |
+| 60-79 | Proceed with Care | Use guard clauses, prefer small changes, re-check after each edit |
+| 40-59 | Needs Work | Significant issues — refactor incrementally in small steps |
+| 0-39 | Stop & Refactor | Refactor BEFORE AI modification. Run `get_refactoring_strategy()` for detected issues. |
 
 ---
 

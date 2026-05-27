@@ -26,9 +26,10 @@ var (
 )
 
 const (
-	LabelGoAhead        = parser.LabelGoAhead
+	LabelGoAhead         = parser.LabelGoAhead
 	LabelProceedWithCare = parser.LabelProceedWithCare
-	LabelStopRefactor   = parser.LabelStopRefactor
+	LabelNeedsWork       = parser.LabelNeedsWork
+	LabelStopRefactor    = parser.LabelStopRefactor
 )
 
 // Analyze runs all detectors on source and returns a QualityResult.

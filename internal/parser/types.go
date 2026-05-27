@@ -13,7 +13,7 @@ type Smell struct {
 // QualityResult is the full output of an analysis.
 type QualityResult struct {
 	Score       int     `json:"score"` // 0-100
-	Label       string  `json:"label"` // one of LabelGoAhead, LabelProceedWithCare, LabelStopRefactor
+	Label       string  `json:"label"` // one of LabelGoAhead, LabelProceedWithCare, LabelNeedsWork, LabelStopRefactor
 	Smells      []Smell `json:"smells"`
 	FilePath    string  `json:"file_path"`
 	Language    string  `json:"language"`
@@ -58,22 +58,55 @@ func DetectedLanguage(ext string) string {
 	}
 }
 
-// Tiers for score classification.
+// Tiers for code quality score classification.
 const (
-	LabelGoAhead        = "Go Ahead"
+	LabelGoAhead         = "Go Ahead"
 	LabelProceedWithCare = "Proceed with Care"
-	LabelStopRefactor   = "Stop & Refactor"
+	LabelNeedsWork       = "Needs Work"
+	LabelStopRefactor    = "Stop & Refactor"
+)
+
+// Tiers for vulnerability severity classification.
+const (
+	VulnLabelClean     = "Clean"
+	VulnLabelMonitor   = "Monitor"
+	VulnLabelRemediate = "Remediate"
 )
 
 func classify(score int) string {
 	switch {
-	case score >= 95:
+	case score >= 80:
 		return LabelGoAhead
-	case score >= 75:
+	case score >= 60:
 		return LabelProceedWithCare
+	case score >= 40:
+		return LabelNeedsWork
 	default:
 		return LabelStopRefactor
 	}
+}
+
+// VulnClassify returns a vulnerability tier based on findings.
+func VulnClassify(findings []struct {
+	Severity string
+}) string {
+	hasAlert := false
+	hasWarning := false
+	for _, f := range findings {
+		switch f.Severity {
+		case "critical", "alert":
+			hasAlert = true
+		case "warning":
+			hasWarning = true
+		}
+	}
+	if hasAlert {
+		return VulnLabelRemediate
+	}
+	if hasWarning {
+		return VulnLabelMonitor
+	}
+	return VulnLabelClean
 }
 
 // severityWeight maps severity strings to penalty weights.

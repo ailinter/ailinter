@@ -53,6 +53,15 @@ func writeMarkdownSummary(results []analyzer.QualityResult) {
 	fmt.Printf("---\n\n")
 	fmt.Printf("## Summary\n\n")
 	fmt.Printf("- **Files analyzed:** %d\n", len(results))
+	var counts = map[string]int{}
+	for _, r := range results {
+		counts[parser.Classify(r.Score)]++
+	}
+	fmt.Printf("- **Go Ahead:** %d | **Care:** %d | **Needs Work:** %d | **Stop:** %d\n",
+		counts[parser.LabelGoAhead],
+		counts[parser.LabelProceedWithCare],
+		counts[parser.LabelNeedsWork],
+		counts[parser.LabelStopRefactor])
 	var highRisk []string
 	for _, r := range results {
 		if parser.Classify(r.Score) == parser.LabelStopRefactor {

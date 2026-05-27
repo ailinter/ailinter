@@ -64,6 +64,8 @@ func scoreBar(score int) string {
 			color = "\033[32m"
 		case parser.LabelProceedWithCare:
 			color = "\033[33m"
+		case parser.LabelNeedsWork:
+			color = "\033[35m"
 		default:
 			color = "\033[31m"
 		}
@@ -91,6 +93,8 @@ func labelBadge(label string) string {
 			color = "\033[32m"
 		case parser.LabelProceedWithCare:
 			color = "\033[33m"
+		case parser.LabelNeedsWork:
+			color = "\033[35m"
 		default:
 			color = "\033[31m"
 		}
@@ -101,6 +105,8 @@ func labelBadge(label string) string {
 		return color + "✓ " + label + reset
 	case parser.LabelProceedWithCare:
 		return color + "~ " + label + reset
+	case parser.LabelNeedsWork:
+		return color + "⚡ " + label + reset
 	default:
 		return color + "✗ " + label + reset
 	}
@@ -290,6 +296,10 @@ func writeHumanSummary(results []analyzer.QualityResult) {
 		if parser.Classify(r.Score) == parser.LabelStopRefactor {
 			highRisk = append(highRisk, r.FilePath)
 		}
+	}
+	var counts = map[string]int{}
+	for _, r := range results {
+		counts[parser.Classify(r.Score)]++
 	}
 
 	fmt.Printf("\n  Summary\n")

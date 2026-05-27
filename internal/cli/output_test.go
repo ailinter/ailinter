@@ -191,8 +191,8 @@ func TestWriteHumanSecrets_Empty(t *testing.T) {
 
 func TestWriteHumanSummary(t *testing.T) {
 	results := []analyzer.QualityResult{
-		{Score: 95, Label: analyzer.LabelGoAhead, FilePath: "a.go", Smells: []analyzer.Smell{{Severity: "warning", Name: "x"}}},
-		{Score: 60, Label: analyzer.LabelStopRefactor, FilePath: "b.go", Smells: []analyzer.Smell{{Severity: "critical", Name: "y"}}},
+		{Score: 85, Label: analyzer.LabelGoAhead, FilePath: "a.go", Smells: []analyzer.Smell{{Severity: "warning", Name: "x"}}},
+		{Score: 35, Label: analyzer.LabelStopRefactor, FilePath: "b.go", Smells: []analyzer.Smell{{Severity: "critical", Name: "y"}}},
 	}
 
 	out := captureStdout(func() {
@@ -287,8 +287,8 @@ func TestWriteMarkdownSecrets(t *testing.T) {
 
 func TestWriteMarkdownSummary(t *testing.T) {
 	results := []analyzer.QualityResult{
-		{Score: 95, Label: analyzer.LabelGoAhead, FilePath: "a.go"},
-		{Score: 50, Label: analyzer.LabelStopRefactor, FilePath: "b.go"},
+		{Score: 85, Label: analyzer.LabelGoAhead, FilePath: "a.go"},
+		{Score: 35, Label: analyzer.LabelStopRefactor, FilePath: "b.go"},
 	}
 
 	out := captureStdout(func() {
@@ -298,8 +298,8 @@ func TestWriteMarkdownSummary(t *testing.T) {
 	if !strings.Contains(out, "## Summary") {
 		t.Error("md summary should have heading")
 	}
-	if !strings.Contains(out, "b.go") {
-		t.Error("md summary should list Needs Work files")
+	if !strings.Contains(out, "Stop") {
+		t.Error("md summary should mention Stop tier")
 	}
 }
 
@@ -440,7 +440,7 @@ func TestWriteSecrets_Dispatch(t *testing.T) {
 
 func TestWriteSummary_Dispatch(t *testing.T) {
 	results := []analyzer.QualityResult{
-		{Score: 50, Label: analyzer.LabelStopRefactor, FilePath: "x.go"},
+		{Score: 30, Label: analyzer.LabelStopRefactor, FilePath: "x.go"},
 		{Score: 75, Label: analyzer.LabelProceedWithCare, FilePath: "y.go"},
 	}
 

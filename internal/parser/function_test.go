@@ -222,8 +222,8 @@ func TestRunBraceDetector_MultipleFuncs(t *testing.T) {
 // === classify function tests ===
 
 func TestClassify_GoAhead(t *testing.T) {
-	if parser.TestClassifyHelper(95) != "Go Ahead" {
-		t.Errorf("expected Go Ahead for 95")
+	if parser.TestClassifyHelper(80) != "Go Ahead" {
+		t.Errorf("expected Go Ahead for 80 (boundary)")
 	}
 	if parser.TestClassifyHelper(100) != "Go Ahead" {
 		t.Errorf("expected Go Ahead for 100")
@@ -231,11 +231,20 @@ func TestClassify_GoAhead(t *testing.T) {
 }
 
 func TestClassify_ProceedWithCare(t *testing.T) {
-	if parser.TestClassifyHelper(75) != "Proceed with Care" {
-		t.Errorf("expected Proceed with Care for 75 (boundary)")
+	if parser.TestClassifyHelper(60) != "Proceed with Care" {
+		t.Errorf("expected Proceed with Care for 60 (boundary)")
 	}
-	if parser.TestClassifyHelper(94) != "Proceed with Care" {
-		t.Errorf("expected Proceed with Care for 94")
+	if parser.TestClassifyHelper(79) != "Proceed with Care" {
+		t.Errorf("expected Proceed with Care for 79")
+	}
+}
+
+func TestClassify_NeedsWork(t *testing.T) {
+	if parser.TestClassifyHelper(40) != "Needs Work" {
+		t.Errorf("expected Needs Work for 40 (boundary)")
+	}
+	if parser.TestClassifyHelper(59) != "Needs Work" {
+		t.Errorf("expected Needs Work for 59")
 	}
 }
 
@@ -243,8 +252,8 @@ func TestClassify_StopRefactor(t *testing.T) {
 	if parser.TestClassifyHelper(10) != "Stop & Refactor" {
 		t.Errorf("expected Stop & Refactor for 10")
 	}
-	if parser.TestClassifyHelper(74) != "Stop & Refactor" {
-		t.Errorf("expected Stop & Refactor for 74 (just below 75 boundary)")
+	if parser.TestClassifyHelper(39) != "Stop & Refactor" {
+		t.Errorf("expected Stop & Refactor for 39 (just below 40 boundary)")
 	}
 }
 

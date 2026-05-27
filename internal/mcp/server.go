@@ -277,6 +277,8 @@ func assessmentRecommendation(label string) string {
 	switch label {
 	case analyzer.LabelStopRefactor:
 		return "RECOMMENDATION: Stop & Refactor before AI modification. Run get_refactoring_strategy() for detected issues."
+	case analyzer.LabelNeedsWork:
+		return "RECOMMENDATION: Needs Work — significant complexity issues detected. Refactor incrementally in 3-5 small steps before adding features."
 	case analyzer.LabelProceedWithCare:
 		return "RECOMMENDATION: Proceed with Care — use guard clauses and small isolated changes. Re-check after each edit."
 	default:
