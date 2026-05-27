@@ -232,23 +232,47 @@ Secrets are **redacted** in MCP output — AI assistants never see the full secr
 
 ## CLI
 
+### `ailinter check` — Analyze files
+
 ```bash
 ailinter check src/main.go               # Single file (auto format)
 ailinter check .                          # Directory scan
 ailinter check --format json app.py       # JSON output
-ailinter check --format markdown app.py   # LLM-friendly
-ailinter check --format problems app.py   # GCC-style (IDE integration)
-ailinter check --no-secrets app.py        # Skip secrets
-ailinter check --no-vulnerabilities app.py # Skip vulnerabilities
+ailinter check --format markdown app.py   # LLM-friendly table output
+ailinter check --format problems app.py   # GCC-style (IDE problem matchers)
+ailinter check --no-secrets app.py        # Skip secrets (safe for AI context)
+ailinter check --no-vulnerabilities app.py # Skip vulnerability scanning
 ailinter check --secrets-only app.py      # Secrets only
-ailinter check --vulnerabilities-only app.py # Vulns only
-ailinter check --lang python script.py    # Force language
-ailinter check --no-gitignore .           # Don't respect .gitignore
-ailinter init                             # Create .ailinter.toml + AGENTS.md
-ailinter mcp                              # Start MCP server
+ailinter check --vulnerabilities-only app.py # Vulnerabilities only
+ailinter check --lang python script.py    # Force language detection
+ailinter check --no-gitignore .           # Don't respect .gitignore patterns
+```
+
+### `ailinter init` — Setup project
+
+```bash
+ailinter init                             # Interactive setup (TTY)
+ailinter init --agent opencode            # OpenCode subagent + skill + MCP
+ailinter init --agent claude              # Claude Code CLAUDE.md + MCP
+ailinter init --agent cursor              # Cursor rules + MCP
+ailinter init --agent copilot             # GitHub Copilot instructions
+ailinter init --agent all                 # All of the above
+ailinter init --vscode                    # .vscode/tasks.json + settings + extensions
+ailinter init --hook                      # .githooks/pre-commit
+ailinter init --profile strict            # Strict threshold profile
+ailinter init --agent all --vscode --hook # Everything at once
+```
+
+See the [Setup Guide](docs/setup.md) for the full interactive flow and all generated files.
+
+### Other commands
+
+```bash
+ailinter mcp                              # Start MCP server on stdio
 ailinter rules list                       # List all threshold defaults
 ailinter rules list --lang python         # Filter by language
 ```
+
 
 ---
 
