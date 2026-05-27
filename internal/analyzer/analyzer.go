@@ -3,7 +3,11 @@ package analyzer
 import (
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
+	"sort"
 
+	"github.com/ailinter/ailinter/internal/config"
 	"github.com/ailinter/ailinter/internal/parser"
 )
 
@@ -20,10 +24,54 @@ type (
 )
 
 var (
-	DefaultThresholds  = parser.DefaultThresholds
-	DetectedLanguage   = parser.DetectedLanguage
-	AnalyzeGitHotspots = parser.AnalyzeGitHotspots
+	DefaultThresholds = parser.DefaultThresholds
+	DetectedLanguage  = parser.DetectedLanguage
 )
+
+func AnalyzeGitHotspots(repoPath string, maxDepth int) GitHotspotResult {
+	result := parser.AnalyzeGitHotspots(repoPath, maxDepth)
+	if result.Error != "" {
+		return result
+	}
+	if len(result.Entries) == 0 {
+		return result
+	}
+
+	sort.Slice(result.Entries, func(i, j int) bool {
+		return result.Entries[i].CommitCount > result.Entries[j].CommitCount
+	})
+
+	analyzeLimit := 50
+	if len(result.Entries) < analyzeLimit {
+		analyzeLimit = len(result.Entries)
+	}
+
+	for i := 0; i < analyzeLimit; i++ {
+		e := &result.Entries[i]
+		absPath := filepath.Join(repoPath, e.FilePath)
+		data, err := os.ReadFile(absPath)
+		if err != nil {
+			continue
+		}
+
+		ext := filepath.Ext(e.FilePath)
+		lang := parser.DetectedLanguage(ext)
+		if lang == "" {
+			continue
+		}
+
+		thresholds := config.LoadProjectThresholds(absPath, lang)
+		qr := Analyze(e.FilePath, string(data), lang, thresholds)
+		e.QualityScore = float64(qr.Score)
+		e.Priority = float64(e.CommitCount) * (100.0 - e.QualityScore + 1)
+	}
+
+	sort.Slice(result.Entries, func(i, j int) bool {
+		return result.Entries[i].Priority > result.Entries[j].Priority
+	})
+
+	return result
+}
 
 const (
 	LabelGoAhead         = parser.LabelGoAhead
