@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "0.5.0-dev"
+var version = "0.0.0-dev"
 
 func main() {
 	telemetry.Version = version
