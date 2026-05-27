@@ -273,7 +273,7 @@ internal/
 ├── cli/                # CLI commands (check, mcp, init)
 ├── config/             # JSON config + .ailinter.toml parser
 ├── mcp/                # MCP server + 7 tool handlers
-├── parser/             # 17 code smell detectors
+├── parser/             # 20 code smell detectors
 ├── refactoring/        # 16 embedded refactoring patterns
 ├── secrets/            # betterleaks 269-rule config + gitleaks wrapper
 ├── telemetry/          # Usage and performance metrics
