@@ -45,11 +45,17 @@ test-report.json
 test-report.html
 report.md
 
-# MCP/Agent artifacts
-.playwright-mcp/
-.opencode/node_modules/
-.opencode/package.json
-.opencode/package-lock.json
-.opencode/.gitignore
-.opencode/bun.lock
+# Internal/private content (not for open-source)
+ailinter-spec.md
+research/
+SecretBench/
+
+# Benchmark repos and data
+benchmarks/repos/
+benchmarks/data/
+benchmarks/report.html
+
+# Local dev tool configs
 opencode.json
+.opencode/
+.playwright-mcp/
