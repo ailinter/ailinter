@@ -40,7 +40,7 @@ func TestIsJWTHeaderOnly(t *testing.T) {
 		{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", true}, // JWT header only (~36 chars, <=50)
 		{"eyJhIn0", true}, // short 3-char header with payload
 		{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature", false}, // full JWT (has dots)
-		{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0", false}, // no signature but has dot
+		{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0", false},           // no signature but has dot
 		{"not-a-jwt", false},
 		{"", false},
 		{"sk_live_12345", false},

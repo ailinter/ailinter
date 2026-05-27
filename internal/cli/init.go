@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -11,56 +11,81 @@ import (
 func InitCommand() *cobra.Command {
 	var skipAgents bool
 	var withVSCode bool
+	var agentFlag string
+	var setupHook bool
+	var profileFlag string
 
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize ailinter in the current project",
-		Long: `Bootstrap ailinter in the current directory by creating:
-  - .ailinter.toml (configuration with language-appropriate defaults)
-  - AGENTS.md (AI agent instructions for this project)
-  - --vscode: also creates .vscode/tasks.json for IDE integration`,
+		Long: `Bootstrap ailinter in the current directory.
+
+Interactive mode (default when run in a terminal):
+  ailinter init
+
+Non-interactive mode (with flags):
+  ailinter init --agent opencode --hook --vscode
+
+Creates:
+  .ailinter.toml          Configuration with thresholds
+  AGENTS.md               AI agent instructions
+
+Per-agent files (via --agent or interactive selection):
+  --agent opencode        opencode.json, .opencode/agent/, .opencode/skills/
+  --agent claude          .claude/settings.json, CLAUDE.md
+  --agent cursor          .cursor/mcp.json, .cursor/rules/
+  --agent copilot         .github/copilot-instructions.md
+  --agent all             All of the above
+  --vscode                .vscode/tasks.json, settings.json, extensions.json
+  --hook                  .githooks/pre-commit (configure git: git config core.hooksPath .githooks)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cwd, err := os.Getwd()
 			if err != nil {
 				return fmt.Errorf("cannot get working directory: %w", err)
 			}
 
-			configPath := filepath.Join(cwd, ".ailinter.toml")
-			if _, err := os.Stat(configPath); err == nil {
-				fmt.Printf(".ailinter.toml already exists at %s\n", configPath)
-			} else {
-				os.WriteFile(configPath, []byte(defaultConfig), 0644)
-				fmt.Println("Created .ailinter.toml")
+			hasAnyFlag := skipAgents || withVSCode || agentFlag != "" || setupHook ||
+				cmd.Flags().Changed("profile") || cmd.Flags().Changed("format")
+
+			if !hasAnyFlag && isInteractive() {
+				return runInteractiveSetup(cwd, false, false)
 			}
 
-			if !skipAgents {
-				agentsPath := filepath.Join(cwd, "AGENTS.md")
-				if _, err := os.Stat(agentsPath); err == nil {
-					fmt.Printf("AGENTS.md already exists at %s (skipping)\n", agentsPath)
-				} else {
-					os.WriteFile(agentsPath, []byte(defaultAgentsMD), 0644)
-					fmt.Println("Created AGENTS.md")
-				}
-			}
-
-			if withVSCode {
-				vscodeDir := filepath.Join(cwd, ".vscode")
-				os.MkdirAll(vscodeDir, 0755)
-				tasksPath := filepath.Join(vscodeDir, "tasks.json")
-				if _, err := os.Stat(tasksPath); err == nil {
-					fmt.Printf(".vscode/tasks.json already exists (skipping)\n")
-				} else {
-					os.WriteFile(tasksPath, []byte(defaultVSCodeTasks), 0644)
-					fmt.Println("Created .vscode/tasks.json")
-				}
-			}
-
-			fmt.Println("\nailinter initialized! Run 'ailinter check .' to analyze your codebase.")
-			return nil
+			return runNonInteractiveSetup(cwd, skipAgents, withVSCode, agentFlag, setupHook, profileFlag)
 		},
 	}
 
 	cmd.Flags().BoolVar(&skipAgents, "no-agents", false, "Skip AGENTS.md creation")
-	cmd.Flags().BoolVar(&withVSCode, "vscode", false, "Also create .vscode/tasks.json for IDE problem integration")
+	cmd.Flags().BoolVar(&withVSCode, "vscode", false, "Create .vscode/tasks.json + settings for IDE integration")
+	cmd.Flags().StringVar(&agentFlag, "agent", "", "AI agent to configure: opencode, claude, cursor, copilot, all")
+	cmd.Flags().BoolVar(&setupHook, "hook", false, "Create .githooks/pre-commit for pre-commit scanning")
+	cmd.Flags().StringVar(&profileFlag, "profile", "default", "Threshold profile: default, strict, relaxed")
 	return cmd
+}
+
+func runNonInteractiveSetup(cwd string, skipAgents, withVSCode bool, agentFlag string, setupHook bool, profileFlag string) error {
+	result := &setupResult{}
+
+	writeConfig(cwd, profileFlag, result)
+	writeAgentsMD(cwd, skipAgents, result)
+
+	switch strings.ToLower(agentFlag) {
+	case "all":
+		for _, agent := range allAgentNames() {
+			writeAgentFiles(cwd, agent, result)
+		}
+	case "opencode", "claude", "cursor", "copilot":
+		writeAgentFiles(cwd, agentFlag, result)
+	}
+
+	if withVSCode {
+		writeVSCodeFiles(cwd, result)
+	}
+	if setupHook {
+		writeGitHook(cwd, result)
+	}
+
+	printResult(result)
+	fmt.Println("\nailinter initialized! Run 'ailinter check .' to analyze your codebase.")
+	return nil
 }

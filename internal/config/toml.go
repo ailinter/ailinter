@@ -16,22 +16,22 @@ type UserConfig struct {
 
 // RulesSection holds per-detector overrides.
 type RulesSection struct {
-	DeepNesting          *RuleInt   `toml:"deep_nesting"`
-	BrainMethod          *RuleLoc   `toml:"brain_method"`
-	FileBloat            *RuleLoc   `toml:"file_bloat"`
+	DeepNesting          *RuleInt      `toml:"deep_nesting"`
+	BrainMethod          *RuleLoc      `toml:"brain_method"`
+	FileBloat            *RuleLoc      `toml:"file_bloat"`
 	ComplexConditional   *RuleBranches `toml:"complex_conditional"`
-	CyclomaticComplexity *RuleInt   `toml:"cyclomatic_complexity"`
-	BumpyRoad            *RuleBump  `toml:"bumpy_road"`
-	LongParameterList    *RuleInt   `toml:"long_parameter_list"`
-	LazyElement          *RuleLine  `toml:"lazy_element"`
-	ParagraphOfCode      *RuleLine  `toml:"paragraph_of_code"`
-	MessageChains        *RuleLine  `toml:"message_chains"`
-	PrimitiveObsession   *RuleLine  `toml:"primitive_obsession"`
-	ExcessiveComments    *RuleLine  `toml:"excessive_comments"`
-	GlobalData           *RuleLine  `toml:"global_data"`
-	LongScopeVariable    *RuleLine  `toml:"long_scope_variable"`
-	DuplicatedCode       *RuleFloat `toml:"duplicated_code"`
-	LongSwitch           *RuleInt   `toml:"long_switch"`
+	CyclomaticComplexity *RuleInt      `toml:"cyclomatic_complexity"`
+	BumpyRoad            *RuleBump     `toml:"bumpy_road"`
+	LongParameterList    *RuleInt      `toml:"long_parameter_list"`
+	LazyElement          *RuleLine     `toml:"lazy_element"`
+	ParagraphOfCode      *RuleLine     `toml:"paragraph_of_code"`
+	MessageChains        *RuleLine     `toml:"message_chains"`
+	PrimitiveObsession   *RuleLine     `toml:"primitive_obsession"`
+	ExcessiveComments    *RuleLine     `toml:"excessive_comments"`
+	GlobalData           *RuleLine     `toml:"global_data"`
+	LongScopeVariable    *RuleLine     `toml:"long_scope_variable"`
+	DuplicatedCode       *RuleFloat    `toml:"duplicated_code"`
+	LongSwitch           *RuleInt      `toml:"long_switch"`
 }
 
 // RuleInt handles thresholds with warning/alert levels.

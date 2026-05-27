@@ -182,15 +182,16 @@ func maybePlural(n int) string {
 // --- retained for test compatibility ---
 
 var severityOrder = map[string]int{"critical": 0, "alert": 1, "warning": 2}
+
 const boxH = "─"
 
-func cardWidthNow() int { return 100 }
-func cardTop(path string)     { fmt.Printf("╭ %s ╮\n", path) }
-func cardDivider()            { fmt.Println("├──┤") }
-func cardBottom()             { fmt.Println("╰──╯") }
-func cardGap()                { fmt.Println() }
+func cardWidthNow() int                           { return 100 }
+func cardTop(path string)                         { fmt.Printf("╭ %s ╮\n", path) }
+func cardDivider()                                { fmt.Println("├──┤") }
+func cardBottom()                                 { fmt.Println("╰──╯") }
+func cardGap()                                    { fmt.Println() }
 func cardLine(format string, args ...interface{}) { fmt.Printf(format+"\n", args...) }
-func cardLineRaw(text string) { fmt.Println(text) }
+func cardLineRaw(text string)                     { fmt.Println(text) }
 func renderGroupedSmells(groups map[string][]analyzer.Smell) {
 	for _, sev := range []string{"critical", "alert", "warning"} {
 		for _, s := range groups[sev] {

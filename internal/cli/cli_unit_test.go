@@ -83,6 +83,16 @@ func TestInitCommand_Idempotent(t *testing.T) {
 	}
 }
 
+func TestInitCommand_HasAllFlags(t *testing.T) {
+	cmd := InitCommand()
+	expected := []string{"no-agents", "vscode", "agent", "hook", "profile"}
+	for _, name := range expected {
+		if cmd.Flags().Lookup(name) == nil {
+			t.Errorf("flag --%s not found in init command", name)
+		}
+	}
+}
+
 func TestIsValidLanguageName(t *testing.T) {
 	valid := []string{"go", "python", "javascript", "typescript", "java", "csharp", "ruby", "swift", "kotlin", "rust", "cpp", "c"}
 	for _, lang := range valid {
@@ -112,7 +122,7 @@ func TestCheckCommand_HasNoVulnerabilitiesFlag(t *testing.T) {
 
 func TestCheckCommand_HasAllFlags(t *testing.T) {
 	cmd := CheckCommand()
-	expected := []string{"format", "no-secrets", "no-vulnerabilities", "lang", "no-gitignore"}
+	expected := []string{"format", "no-secrets", "no-vulnerabilities", "secrets-only", "vulnerabilities-only", "lang", "no-gitignore"}
 	for _, name := range expected {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("flag --%s not found", name)

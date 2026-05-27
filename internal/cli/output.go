@@ -249,15 +249,15 @@ func writeJSONResults(results []analyzer.QualityResult) {
 }
 
 type combinedResult struct {
-	CodeQuality        analyzer.QualityResult     `json:"code_quality"`
-	SecretScan         []secrets.SecretFinding     `json:"secret_scan,omitempty"`
-	VulnerabilityScan  []vulnerability.Finding     `json:"vulnerability_scan,omitempty"`
+	CodeQuality       analyzer.QualityResult  `json:"code_quality"`
+	SecretScan        []secrets.SecretFinding `json:"secret_scan,omitempty"`
+	VulnerabilityScan []vulnerability.Finding `json:"vulnerability_scan,omitempty"`
 }
 
 type combinedDirResult struct {
-	CodeQuality        []analyzer.QualityResult    `json:"code_quality"`
-	SecretScan         []secrets.SecretFinding     `json:"secret_scan,omitempty"`
-	VulnerabilityScan  []vulnerability.Finding     `json:"vulnerability_scan,omitempty"`
+	CodeQuality       []analyzer.QualityResult `json:"code_quality"`
+	SecretScan        []secrets.SecretFinding  `json:"secret_scan,omitempty"`
+	VulnerabilityScan []vulnerability.Finding  `json:"vulnerability_scan,omitempty"`
 }
 
 func writeCombinedJSON(result analyzer.QualityResult, data []byte, path string, noSecrets bool, noVulnerabilities bool) {

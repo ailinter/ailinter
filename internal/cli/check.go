@@ -18,24 +18,24 @@ import (
 )
 
 type checkOptions struct {
-	format            FormatMode
-	noSecrets         bool
-	noVulnerabilities bool
-	secretsOnly       bool
+	format              FormatMode
+	noSecrets           bool
+	noVulnerabilities   bool
+	secretsOnly         bool
 	vulnerabilitiesOnly bool
-	langOverride      string
+	langOverride        string
 }
 
 func CheckCommand() *cobra.Command {
 	var (
-		formatFlag         string
-		jsonFlag           bool
-		noSecrets          bool
-		noVulnerabilities  bool
-		secretsOnly        bool
+		formatFlag          string
+		jsonFlag            bool
+		noSecrets           bool
+		noVulnerabilities   bool
+		secretsOnly         bool
 		vulnerabilitiesOnly bool
-		langOverride       string
-		noGitignore        bool
+		langOverride        string
+		noGitignore         bool
 	)
 
 	cmd := &cobra.Command{
@@ -73,12 +73,12 @@ Targeted scans:
 				return fmt.Errorf("unknown language: %s (valid: go, python, javascript, typescript, java, csharp, ruby, swift, kotlin, rust, cpp, c)", langOverride)
 			}
 			opts := checkOptions{
-				format:             mode,
-				noSecrets:          noSecrets,
-				noVulnerabilities:  noVulnerabilities,
-				secretsOnly:        secretsOnly,
+				format:              mode,
+				noSecrets:           noSecrets,
+				noVulnerabilities:   noVulnerabilities,
+				secretsOnly:         secretsOnly,
 				vulnerabilitiesOnly: vulnerabilitiesOnly,
-				langOverride:       langOverride,
+				langOverride:        langOverride,
 			}
 			return executeCheck(args[0], opts, !noGitignore)
 		},
@@ -197,12 +197,12 @@ func checkDirectory(dir string, opts checkOptions, respectGitignore bool) error 
 	scanVulns := !opts.noVulnerabilities || opts.vulnerabilitiesOnly
 
 	ctx := &walkContext{
-		opts:           opts,
-		resolvedDir:    resolvedDir,
-		gitignorePats:  nil,
-		scanQuality:    scanQuality,
-		scanner:        nil,
-		vulnScanner:    nil,
+		opts:          opts,
+		resolvedDir:   resolvedDir,
+		gitignorePats: nil,
+		scanQuality:   scanQuality,
+		scanner:       nil,
+		vulnScanner:   nil,
 	}
 	if respectGitignore {
 		ctx.gitignorePats = loadGitignore(resolvedDir)

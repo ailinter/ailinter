@@ -98,7 +98,7 @@ long_switch = { warning = 15, alert = 30 }
 	thresholds := config.LoadProjectThresholds(dir, "go")
 
 	checks := []struct {
-		name     string
+		name      string
 		got, want int
 	}{
 		{"NestingWarning", thresholds.NestingWarning, 5},

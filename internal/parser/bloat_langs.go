@@ -281,8 +281,8 @@ func countLeadingTabs(line string) int {
 func DetectFunctionBloatsIndent(lines []string, indentSize int) []FunctionBloat {
 	var results []FunctionBloat
 	type funcStack struct {
-		name  string
-		start int
+		name   string
+		start  int
 		indent int
 	}
 	var stack []funcStack
@@ -318,8 +318,8 @@ func DetectFunctionBloatsIndent(lines []string, indentSize int) []FunctionBloat 
 				stack = stack[:len(stack)-1]
 			}
 			stack = append(stack, funcStack{
-				name:  extractPythonFuncName(trimmed),
-				start: i + 1,
+				name:   extractPythonFuncName(trimmed),
+				start:  i + 1,
 				indent: indent,
 			})
 			continue
@@ -342,8 +342,8 @@ func DetectFunctionBloatsIndent(lines []string, indentSize int) []FunctionBloat 
 		// (handles cases where 'def' appears mid-line, unlikely but defensive)
 		if len(stack) == 0 && (strings.HasPrefix(trimmed, "def ") || strings.HasPrefix(trimmed, "async def ")) {
 			stack = append(stack, funcStack{
-				name:  extractPythonFuncName(trimmed),
-				start: i + 1,
+				name:   extractPythonFuncName(trimmed),
+				start:  i + 1,
 				indent: indent,
 			})
 		}

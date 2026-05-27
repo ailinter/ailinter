@@ -24,9 +24,9 @@ type Config struct {
 
 // ProjectConfig holds the project-level .ailinter.toml configuration.
 type ProjectConfig struct {
-	Path    string     `json:"path,omitempty"`
-	Extends string     `json:"extends,omitempty"`
-	Rules   RulesInfo  `json:"rules,omitempty"`
+	Path    string    `json:"path,omitempty"`
+	Extends string    `json:"extends,omitempty"`
+	Rules   RulesInfo `json:"rules,omitempty"`
 }
 
 // RulesInfo holds readable rule overrides from .ailinter.toml.

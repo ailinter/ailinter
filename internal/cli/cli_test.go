@@ -344,3 +344,183 @@ func TestCLI_JSONOutputHasCodeQualityAndVulnKeys(t *testing.T) {
 		t.Error("JSON output should contain vulnerability_scan key")
 	}
 }
+
+func TestCLI_InitAgentOpenCode(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	cmd := exec.Command(bin, "init", "--agent", "opencode")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	t.Logf("output: %s", out)
+	if err != nil {
+		t.Fatalf("init --agent opencode failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "opencode.json")); err != nil {
+		t.Error("opencode.json not created")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".opencode", "agent", "ailinter.md")); err != nil {
+		t.Error(".opencode/agent/ailinter.md not created")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".opencode", "skills", "ailinter", "SKILL.md")); err != nil {
+		t.Error(".opencode/skills/ailinter/SKILL.md not created")
+	}
+}
+
+func TestCLI_InitAgentClaude(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	cmd := exec.Command(bin, "init", "--agent", "claude")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	t.Logf("output: %s", out)
+	if err != nil {
+		t.Fatalf("init --agent claude failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".claude", "settings.json")); err != nil {
+		t.Error(".claude/settings.json not created")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "CLAUDE.md")); err != nil {
+		t.Error("CLAUDE.md not created")
+	}
+}
+
+func TestCLI_InitAgentCursor(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	cmd := exec.Command(bin, "init", "--agent", "cursor")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	t.Logf("output: %s", out)
+	if err != nil {
+		t.Fatalf("init --agent cursor failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".cursor", "mcp.json")); err != nil {
+		t.Error(".cursor/mcp.json not created")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".cursor", "rules", "ailinter.mdc")); err != nil {
+		t.Error(".cursor/rules/ailinter.mdc not created")
+	}
+}
+
+func TestCLI_InitAgentCopilot(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	cmd := exec.Command(bin, "init", "--agent", "copilot")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	t.Logf("output: %s", out)
+	if err != nil {
+		t.Fatalf("init --agent copilot failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".github", "copilot-instructions.md")); err != nil {
+		t.Error(".github/copilot-instructions.md not created")
+	}
+}
+
+func TestCLI_InitAgentAll(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	cmd := exec.Command(bin, "init", "--agent", "all")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	t.Logf("output: %s", out)
+	if err != nil {
+		t.Fatalf("init --agent all failed: %v", err)
+	}
+	checks := []string{
+		filepath.Join(dir, "opencode.json"),
+		filepath.Join(dir, ".claude", "settings.json"),
+		filepath.Join(dir, ".cursor", "mcp.json"),
+		filepath.Join(dir, ".github", "copilot-instructions.md"),
+		filepath.Join(dir, "CLAUDE.md"),
+	}
+	for _, p := range checks {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("%s not created", p)
+		}
+	}
+}
+
+func TestCLI_InitHook(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	cmd := exec.Command(bin, "init", "--hook")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	t.Logf("output: %s", out)
+	if err != nil {
+		t.Fatalf("init --hook failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".githooks", "pre-commit")); err != nil {
+		t.Error(".githooks/pre-commit not created")
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, ".githooks", "pre-commit"))
+	if !strings.Contains(string(data), "ailinter check") {
+		t.Error("pre-commit hook should contain ailinter check")
+	}
+}
+
+func TestCLI_InitProfileStrict(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	cmd := exec.Command(bin, "init", "--profile", "strict")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	t.Logf("output: %s", out)
+	if err != nil {
+		t.Fatalf("init --profile strict failed: %v", err)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, ".ailinter.toml"))
+	s := string(data)
+	if !strings.Contains(s, "strict thresholds") {
+		t.Error("should contain strict thresholds comment")
+	}
+	if !strings.Contains(s, "cyclomatic_complexity") {
+		t.Error("strict config should include cyclomatic_complexity")
+	}
+}
+
+func TestCLI_InitVSCodePlusAgent(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	cmd := exec.Command(bin, "init", "--vscode", "--agent", "claude", "--hook")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	t.Logf("output: %s", out)
+	if err != nil {
+		t.Fatalf("combined init failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".vscode", "tasks.json")); err != nil {
+		t.Error(".vscode/tasks.json not created")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".vscode", "settings.json")); err != nil {
+		t.Error(".vscode/settings.json not created")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".vscode", "extensions.json")); err != nil {
+		t.Error(".vscode/extensions.json not created")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "CLAUDE.md")); err != nil {
+		t.Error("CLAUDE.md not created")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".githooks", "pre-commit")); err != nil {
+		t.Error(".githooks/pre-commit not created")
+	}
+}
+
+func TestCLI_InitFlagsCombined(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	cmd := exec.Command(bin, "init", "--no-agents", "--agent", "opencode")
+	cmd.Dir = dir
+	out, _ := cmd.CombinedOutput()
+	s := string(out)
+	if !strings.Contains(s, ".ailinter.toml") {
+		t.Error("should bootstrap when flag forces non-interactive")
+	}
+	if !strings.Contains(s, "opencode") {
+		t.Error("should create opencode agent files")
+	}
+	if strings.Contains(s, "AGENTS.md") {
+		t.Error("should skip AGENTS.md with --no-agents")
+	}
+}

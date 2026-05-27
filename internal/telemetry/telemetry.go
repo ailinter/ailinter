@@ -41,8 +41,6 @@ func getEnvOrDefault(key, fallback string) string {
 	return fallback
 }
 
-
-
 func Init(ctx context.Context) {
 	initOnce.Do(func() {
 		IsEnabled = resolveEnabled()
