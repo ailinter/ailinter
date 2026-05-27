@@ -1,0 +1,29 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    attributes:
+      label: Description
+      description: What would you like ailinter to do?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Use case
+      description: How would this feature improve your workflow?
+  - type: dropdown
+    attributes:
+      label: Pillar
+      description: Which pillar does this relate to?
+      options:
+        - Code Quality Radar (Pillar 1)
+        - Secret Scanning (Pillar 2)
+        - Refactoring Guide (Pillar 3)
+        - Infrastructure + Dependency Guard (Pillar 4)
+        - CLI / Output
+        - MCP Server
+        - Configuration
+        - CI / GitHub Integration
+        - Other

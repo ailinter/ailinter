@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+      - name: go vet
+        run: go vet ./...
+      - name: go fmt check
+        run: |
+          fmt=$(go fmt ./...)
+          if [ -n "$fmt" ]; then echo "$fmt"; exit 1; fi
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+      - name: Run tests
+        run: go test ./... -v -count=1 -coverprofile=coverage.out -covermode=count
+      - name: Check coverage
+        run: |
+          coverage=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//')
+          echo "Coverage: $coverage%"
+          if (( $(echo "$coverage < 80" | bc -l) )); then
+            echo "Coverage below 80%: $coverage%"
+            exit 1
+          fi
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+      - name: Build
+        run: go build -ldflags "-X main.version=${{ github.ref_name }}" -o bin/ailinter ./cmd/ailinter
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ailinter-linux-amd64
+          path: bin/ailinter
+
+  cross-build:
+    name: Cross-build (${{ matrix.os }}/${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+          - os: linux
+            arch: arm64
+          - os: windows
+            arch: amd64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+      - name: Cross-build
+        run: |
+          suffix=""
+          [ "${{ matrix.os }}" = "windows" ] && suffix=".exe"
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build \
+            -ldflags "-X main.version=${{ github.ref_name }}" \
+            -o bin/ailinter-${{ matrix.os }}-${{ matrix.arch }}$suffix \
+            ./cmd/ailinter
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ailinter-${{ matrix.os }}-${{ matrix.arch }}
+          path: bin/ailinter-${{ matrix.os }}-${{ matrix.arch }}*
+
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+      - name: Run benchmarks
+        run: go test ./internal/... -bench=. -benchmem -count=3 | tee benchmark.txt
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmarks
+          path: benchmark.txt

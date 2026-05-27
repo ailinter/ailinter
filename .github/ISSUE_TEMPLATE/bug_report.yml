@@ -1,0 +1,30 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    attributes:
+      label: Description
+      description: What happened, and what did you expect to happen?
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: ailinter version
+      description: Run `ailinter --version`
+      placeholder: "0.5.0-dev"
+  - type: input
+    attributes:
+      label: OS and architecture
+      placeholder: "macOS arm64, Linux amd64, Windows amd64"
+  - type: textarea
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands and file content to reproduce the issue
+      render: shell
+  - type: textarea
+    attributes:
+      label: Output
+      description: Full output from running ailinter
+      render: text
