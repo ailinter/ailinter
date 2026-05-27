@@ -9,7 +9,7 @@ import (
 )
 
 // MCPCommand returns the `mcp` subcommand.
-func MCPCommand() *cobra.Command {
+func MCPCommand(version string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "mcp",
 		Short: "Start ailinter as an MCP server (stdio)",
@@ -28,7 +28,7 @@ Add to your MCP configuration:
   }`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Fprintln(os.Stderr, "ailinter MCP server starting on stdio...")
-			return mcp.Serve()
+			return mcp.Serve(version)
 		},
 	}
 }

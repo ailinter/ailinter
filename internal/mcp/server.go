@@ -6,27 +6,29 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ailinter/ailinter/internal/analyzer"
 	"github.com/ailinter/ailinter/internal/config"
 	"github.com/ailinter/ailinter/internal/refactoring"
 	"github.com/ailinter/ailinter/internal/secrets"
+	"github.com/ailinter/ailinter/internal/vulnerability"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // Serve starts the MCP server on stdio.
-func Serve() error {
+func Serve(version string) error {
 	s := server.NewMCPServer(
 		"ailinter",
-		"0.1.0",
+		version,
 		server.WithToolCapabilities(true),
 	)
 
 	// Tool 1: analyze_code
 	s.AddTool(mcp.NewTool(
 		"analyze_code",
-		mcp.WithDescription("Analyze a source file for Code Quality issues: complexity, nesting, size, bumpy roads, and more. Returns a quality score (0-100) and detailed findings."),
+		mcp.WithDescription("Analyze a source file for Code Quality issues (complexity, nesting, size, bumpy roads) and security vulnerabilities (injection, XSS, deserialization, weak crypto, XXE). Returns a quality score (0-100) and detailed findings."),
 		mcp.WithString("file_path",
 			mcp.Required(),
 			mcp.Description("Absolute or relative path to the source file to analyze"),
@@ -98,22 +100,41 @@ func handleAnalyzeCode(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 		return mcp.NewToolResultError("file_path is required"), nil
 	}
 
-	data, err := os.ReadFile(filePath)
+	resolvedPath, err := resolveAndValidatePath(filePath)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	data, err := os.ReadFile(resolvedPath)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to read file: %v", err)), nil
 	}
 
-	ext := filepath.Ext(filePath)
-	lang := analyzer.DetectedLanguage(ext)
-	if lang == "" {
-		lang = "go" // default
+	if isBinaryContent(data) {
+		return mcp.NewToolResultError("cannot analyze binary file"), nil
 	}
 
-	thresholds := config.LoadProjectThresholds(filePath, lang)
-	result := analyzer.Analyze(filePath, string(data), lang, thresholds)
+	ext := filepath.Ext(resolvedPath)
+	lang := analyzer.DetectedLanguage(ext)
+	if lang == "" {
+		lang = "go"
+	}
 
-	output, _ := json.MarshalIndent(result, "", "  ")
-	return mcp.NewToolResultText(string(output)), nil
+	thresholds := config.LoadProjectThresholds(resolvedPath, lang)
+	result := analyzer.Analyze(resolvedPath, string(data), lang, thresholds)
+
+	vulnScanner := vulnerability.NewScanner()
+	vulnFindings := vulnScanner.Scan(string(data), resolvedPath)
+
+	combined := struct {
+		analyzer.QualityResult
+		VulnerabilityScan []vulnerability.Finding `json:"vulnerability_scan,omitempty"`
+	}{
+		QualityResult:     result,
+		VulnerabilityScan: vulnFindings,
+	}
+
+	return mcp.NewToolResultStructuredOnly(combined), nil
 }
 
 func handleScanForSecrets(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -132,8 +153,7 @@ func handleScanForSecrets(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 	}
 
 	findings := scanner.ScanString(content, "<inline>")
-	output, _ := json.MarshalIndent(findings, "", "  ")
-	return mcp.NewToolResultText(string(output)), nil
+	return mcp.NewToolResultStructuredOnly(findings), nil
 }
 
 func handleGetRefactoringStrategy(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -165,20 +185,33 @@ func handleAssessFile(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallTo
 		return mcp.NewToolResultError("file_path is required"), nil
 	}
 
-	data, err := os.ReadFile(filePath)
+	resolvedPath, err := resolveAndValidatePath(filePath)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	data, err := os.ReadFile(resolvedPath)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to read file: %v", err)), nil
 	}
 
-	ext := filepath.Ext(filePath)
+	if isBinaryContent(data) {
+		return mcp.NewToolResultError("cannot analyze binary file"), nil
+	}
+
+	ext := filepath.Ext(resolvedPath)
 	lang := analyzer.DetectedLanguage(ext)
 	if lang == "" {
 		lang = "go"
 	}
 
-	thresholds := config.LoadProjectThresholds(filePath, lang)
-	result := analyzer.Analyze(filePath, string(data), lang, thresholds)
+	thresholds := config.LoadProjectThresholds(resolvedPath, lang)
+	result := analyzer.Analyze(resolvedPath, string(data), lang, thresholds)
 
+	return mcp.NewToolResultText(buildAssessmentSummary(result)), nil
+}
+
+func buildAssessmentSummary(result analyzer.QualityResult) string {
 	summary := fmt.Sprintf("%s — Score: %d/100", result.Label, result.Score)
 	if len(result.Smells) > 0 {
 		summary += fmt.Sprintf("\nDetected %d issues:", len(result.Smells))
@@ -186,13 +219,22 @@ func handleAssessFile(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallTo
 			summary += fmt.Sprintf("\n  - %s (%s): %s", s.Name, s.Severity, s.Message)
 		}
 	}
-	if result.Label == analyzer.LabelStopRefactor {
-		summary += "\n\nRECOMMENDATION: Stop & Refactor before AI modification. Run get_refactoring_strategy() for detected issues."
-	} else if result.Label == analyzer.LabelProceedWithCare {
-		summary += "\n\nRECOMMENDATION: Proceed with Care — use guard clauses and small isolated changes. Re-check after each edit."
+	rec := assessmentRecommendation(result.Label)
+	if rec != "" {
+		summary += "\n\n" + rec
 	}
+	return summary
+}
 
-	return mcp.NewToolResultText(summary), nil
+func assessmentRecommendation(label string) string {
+	switch label {
+	case analyzer.LabelStopRefactor:
+		return "RECOMMENDATION: Stop & Refactor before AI modification. Run get_refactoring_strategy() for detected issues."
+	case analyzer.LabelProceedWithCare:
+		return "RECOMMENDATION: Proceed with Care — use guard clauses and small isolated changes. Re-check after each edit."
+	default:
+		return ""
+	}
 }
 
 func handleSetConfig(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -205,19 +247,19 @@ func handleSetConfig(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	if key == "" {
 		return mcp.NewToolResultError("key is required"), nil
 	}
-	result, err := config.Set(key, value)
+	cfg, err := config.SetAndGet(key, value)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	return mcp.NewToolResultText("Configuration updated:\n" + result), nil
+	return mcp.NewToolResultStructured(cfg, fmt.Sprintf("Configuration updated:\n%s", mustMarshalIndent(cfg))), nil
 }
 
 func handleGetConfig(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	result, err := config.Get()
+	cfg, err := config.GetConfig()
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	return mcp.NewToolResultText("Current configuration:\n" + result), nil
+	return mcp.NewToolResultStructured(cfg, fmt.Sprintf("Current configuration:\n%s", mustMarshalIndent(cfg))), nil
 }
 
 func handleListHotspots(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -236,7 +278,54 @@ func handleListHotspots(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError(result.Error), nil
 	}
 
-	output, _ := json.MarshalIndent(result.Entries[:min(20, len(result.Entries))], "", "  ")
-	return mcp.NewToolResultText(fmt.Sprintf("Frequently-changed files in %s (%d files analyzed, showing top 20):\n%s",
-		repoPath, len(result.Entries), string(output))), nil
+	entries := result.Entries[:min(20, len(result.Entries))]
+	fallback := fmt.Sprintf("Frequently-changed files in %s (%d files analyzed, showing top 20):\n", repoPath, len(result.Entries))
+	output, _ := json.MarshalIndent(entries, "", "  ")
+	return mcp.NewToolResultStructured(entries, fallback+string(output)), nil
+}
+
+func resolveAndValidatePath(filePath string) (string, error) {
+	cleaned := filepath.Clean(filePath)
+	abs, err := filepath.Abs(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve path: %w", err)
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("cannot determine working directory: %w", err)
+	}
+	resolvedCwd, err := filepath.EvalSymlinks(cwd)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve working directory: %w", err)
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve path: %w", err)
+	}
+	prefix := resolvedCwd + string(os.PathSeparator)
+	if resolved != resolvedCwd && !strings.HasPrefix(resolved, prefix) {
+		return "", fmt.Errorf("access denied: path '%s' is outside the working directory", filePath)
+	}
+	return resolved, nil
+}
+
+func isBinaryContent(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+	checkLen := 8000
+	if len(data) < checkLen {
+		checkLen = len(data)
+	}
+	for _, b := range data[:checkLen] {
+		if b == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func mustMarshalIndent(v any) string {
+	data, _ := json.MarshalIndent(v, "", "  ")
+	return string(data)
 }

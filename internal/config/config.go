@@ -19,6 +19,27 @@ type Config struct {
 	RepoPath     string         `json:"repo_path,omitempty"`
 	Thresholds   map[string]int `json:"thresholds,omitempty"`
 	DisableGit   bool           `json:"disable_git,omitempty"`
+	Project      *ProjectConfig `json:"project,omitempty"`
+}
+
+// ProjectConfig holds the project-level .ailinter.toml configuration.
+type ProjectConfig struct {
+	Path    string     `json:"path,omitempty"`
+	Extends string     `json:"extends,omitempty"`
+	Rules   RulesInfo  `json:"rules,omitempty"`
+}
+
+// RulesInfo holds readable rule overrides from .ailinter.toml.
+type RulesInfo struct {
+	DeepNesting          *int     `json:"deep_nesting_warning,omitempty"`
+	BrainMethod          *int     `json:"brain_method_warning_lines,omitempty"`
+	FileBloat            *int     `json:"file_bloat_warning_lines,omitempty"`
+	CyclomaticComplexity *int     `json:"cyclomatic_complexity_warning,omitempty"`
+	BumpyRoad            *int     `json:"bumpy_road_bumps_warning,omitempty"`
+	LongParameterList    *int     `json:"long_parameter_list_warning,omitempty"`
+	ComplexConditional   *int     `json:"complex_conditional_branches_warning,omitempty"`
+	LongSwitch           *int     `json:"long_switch_warning,omitempty"`
+	ExcessiveComments    *float64 `json:"excessive_comments_ratio,omitempty"`
 }
 
 var configPath string
@@ -78,15 +99,52 @@ func Get() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if c.AccessToken != "" {
+		c.AccessToken = "***"
+	}
+	cwd, err := os.Getwd()
+	if err == nil {
+		c.Project = LoadProjectConfigFile(cwd)
+	}
 	data, _ := json.MarshalIndent(c, "", "  ")
 	return string(data), nil
 }
 
 // Set updates a config value by key and persists.
 func Set(key, value string) (string, error) {
-	c, err := Load()
+	c, err := applyAndSave(key, value)
 	if err != nil {
 		return "", err
+	}
+	data, _ := json.MarshalIndent(c, "", "  ")
+	return string(data), nil
+}
+
+// GetConfig returns the current config struct with sensitive fields redacted.
+func GetConfig() (*Config, error) {
+	c, err := Load()
+	if err != nil {
+		return nil, err
+	}
+	if c.AccessToken != "" {
+		c.AccessToken = "***"
+	}
+	cwd, err := os.Getwd()
+	if err == nil {
+		c.Project = LoadProjectConfigFile(cwd)
+	}
+	return c, nil
+}
+
+// SetAndGet sets a config value and returns the updated config struct with sensitive fields redacted.
+func SetAndGet(key, value string) (*Config, error) {
+	return applyAndSave(key, value)
+}
+
+func applyAndSave(key, value string) (*Config, error) {
+	c, err := Load()
+	if err != nil {
+		return nil, err
 	}
 
 	switch key {
@@ -107,15 +165,21 @@ func Set(key, value string) (string, error) {
 	case "disable_git":
 		c.DisableGit = value == "true" || value == "1"
 	default:
-		return "", fmt.Errorf("unknown config key: %s (valid: access_token, onprem_url, default_path, language, repo_path, enabled_tools, read_only, disable_git)", key)
+		return nil, fmt.Errorf("unknown config key: %s (valid: access_token, onprem_url, default_path, language, repo_path, enabled_tools, read_only, disable_git)", key)
 	}
 
 	if err := Save(c); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	data, _ := json.MarshalIndent(c, "", "  ")
-	return string(data), nil
+	if c.AccessToken != "" {
+		c.AccessToken = "***"
+	}
+	cwd, err := os.Getwd()
+	if err == nil {
+		c.Project = LoadProjectConfigFile(cwd)
+	}
+	return c, nil
 }
 
 func parseToolList(value string) []string {

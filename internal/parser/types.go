@@ -49,6 +49,10 @@ func DetectedLanguage(ext string) string {
 		return "kotlin"
 	case ".cs":
 		return "csharp"
+	case ".yaml", ".yml":
+		return "yaml"
+	case ".html", ".htm":
+		return "html"
 	default:
 		return ""
 	}

@@ -5,7 +5,7 @@ Code has many conditionals and loops nested inside one another (3+ levels deep).
 
 ## Why It's Harmful
 - **Cognitive overload**: Working memory limited to ~3-4 items. Each nesting level requires holding additional context.
-- **High defect correlation**: CodeScene research shows nested complexity is a stronger predictor of defects than cyclomatic complexity.
+- **High defect correlation**: Research shows nested complexity is a stronger predictor of defects than cyclomatic complexity.
 - **AI failure risk**: AI models are 60% more likely to introduce defects in deeply nested code.
 
 ## Step-by-Step Refactoring

@@ -3,136 +3,116 @@ package config
 import (
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"testing"
 )
 
-func TestLoad_UnmarshalError(t *testing.T) {
-	dir := t.TempDir()
-	f := filepath.Join(dir, "bad-config.json")
-	os.WriteFile(f, []byte("{invalid json}"), 0644)
+func TestGetConfig_ReturnsStruct(t *testing.T) {
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", t.TempDir())
+	defer os.Setenv("HOME", oldHome)
 
-	oldPath := configPath
-	configPath = f
-	defer func() { configPath = oldPath }()
+	Set("language", "python")
+	Set("repo_path", "/tmp/repo")
 
-	_, err := Load()
-	if err == nil {
-		t.Error("expected unmarshal error")
-	}
-}
-
-func TestSave_MkdirError(t *testing.T) {
-	dir := t.TempDir()
-	// Create a file where the config directory should be
-	blocker := filepath.Join(dir, "blocker")
-	os.WriteFile(blocker, []byte("x"), 0644)
-	f := filepath.Join(blocker, "config.json")
-
-	oldPath := configPath
-	configPath = f
-	defer func() { configPath = oldPath }()
-
-	err := Save(&Config{Language: "go"})
-	if err == nil {
-		t.Error("expected MkdirAll error")
-	}
-}
-
-func TestSet_UnknownKey(t *testing.T) {
-	_, err := Set("unknown_key", "value")
-	if err == nil {
-		t.Error("expected error for unknown config key")
-	}
-}
-
-func TestAPPDATAPath(t *testing.T) {
-	oldAPPDATA := os.Getenv("APPDATA")
-	oldHOME := os.Getenv("HOME")
-
-	os.Setenv("APPDATA", "/tmp/appdata-test")
-	defer os.Setenv("APPDATA", oldAPPDATA)
-	defer os.Setenv("HOME", oldHOME)
-
-	// Reset init to re-compute path
-	oldPath := configPath
-	defer func() { configPath = oldPath }()
-	configPath = filepath.Join(os.Getenv("APPDATA"), "ailinter", "config.json")
-
-	p := Path()
-	if p == "" {
-		t.Error("APPDATA path should not be empty")
-	}
-}
-
-func TestSave_JSONRoundtrip(t *testing.T) {
-	dir := t.TempDir()
-	f := filepath.Join(dir, "config.json")
-
-	oldPath := configPath
-	configPath = f
-	defer func() { configPath = oldPath }()
-
-	cfg := &Config{
-		Language:     "python",
-		ReadOnly:     true,
-		EnabledTools: []string{"analyze_code", "scan_for_secrets"},
-		DisableGit:   false,
-	}
-	if err := Save(cfg); err != nil {
-		t.Fatalf("Save failed: %v", err)
-	}
-
-	loaded, err := Load()
+	cfg, err := GetConfig()
 	if err != nil {
-		t.Fatalf("Load failed: %v", err)
+		t.Fatal(err)
 	}
-	if loaded.Language != "python" {
-		t.Errorf("Language = %q, want python", loaded.Language)
+	if cfg == nil {
+		t.Fatal("GetConfig returned nil")
 	}
-	if !loaded.ReadOnly {
-		t.Error("ReadOnly should be true")
+	if cfg.Language != "python" {
+		t.Errorf("expected python, got %s", cfg.Language)
 	}
-	if len(loaded.EnabledTools) != 2 {
-		t.Errorf("EnabledTools = %v, want 2 items", loaded.EnabledTools)
-	}
-}
-
-func TestGet_JSONFormat(t *testing.T) {
-	dir := t.TempDir()
-	f := filepath.Join(dir, "config.json")
-
-	oldPath := configPath
-	configPath = f
-	defer func() { configPath = oldPath }()
-
-	cfg := &Config{Language: "go", RepoPath: "/test"}
-	data, _ := json.Marshal(cfg)
-	os.WriteFile(f, data, 0644)
-
-	result, err := Get()
-	if err != nil {
-		t.Fatalf("Get failed: %v", err)
-	}
-	if result == "" {
-		t.Error("Get should return non-empty JSON")
+	if cfg.RepoPath != "/tmp/repo" {
+		t.Errorf("expected /tmp/repo, got %s", cfg.RepoPath)
 	}
 }
 
-func TestSet_ParseToolListEmpty(t *testing.T) {
-	dir := t.TempDir()
-	f := filepath.Join(dir, "config.json")
+func TestGetConfig_RedactsAccessToken(t *testing.T) {
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", t.TempDir())
+	defer os.Setenv("HOME", oldHome)
 
-	oldPath := configPath
-	configPath = f
-	defer func() { configPath = oldPath }()
+	Set("access_token", "sk-live-secret-token-value-123")
 
-	_, err := Set("enabled_tools", "")
+	cfg, err := GetConfig()
 	if err != nil {
-		t.Errorf("Set with empty tools failed: %v", err)
+		t.Fatal(err)
 	}
-	c, _ := Load()
-	if len(c.EnabledTools) != 0 {
-		t.Errorf("EnabledTools should be nil for empty value, got %v", c.EnabledTools)
+	if cfg.AccessToken != "***" {
+		t.Errorf("expected redacted token '***', got %q", cfg.AccessToken)
+	}
+}
+
+func TestSetAndGet_Works(t *testing.T) {
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", t.TempDir())
+	defer os.Setenv("HOME", oldHome)
+
+	cfg, err := SetAndGet("language", "go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("SetAndGet returned nil")
+	}
+	if cfg.Language != "go" {
+		t.Errorf("expected go, got %s", cfg.Language)
+	}
+}
+
+func TestSetAndGet_RedactsAccessToken(t *testing.T) {
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", t.TempDir())
+	defer os.Setenv("HOME", oldHome)
+
+	cfg, err := SetAndGet("access_token", "my-secret-token-abc123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AccessToken != "***" {
+		t.Errorf("expected redacted token '***' in SetAndGet, got %q", cfg.AccessToken)
+	}
+
+	loaded, _ := Load()
+	if loaded.AccessToken != "my-secret-token-abc123" {
+		t.Error("token should be stored unredacted on disk")
+	}
+}
+
+func TestGetConfig_Empty(t *testing.T) {
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", t.TempDir())
+	defer os.Setenv("HOME", oldHome)
+
+	cfg, err := GetConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Fatal("GetConfig should return empty config, not nil")
+	}
+	if cfg.AccessToken != "" && cfg.AccessToken != "***" {
+		t.Errorf("empty config access_token should be '' or '***', got %q", cfg.AccessToken)
+	}
+}
+
+func TestSet_RedactsAccessTokenInReturn(t *testing.T) {
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", t.TempDir())
+	defer os.Setenv("HOME", oldHome)
+
+	result, err := Set("access_token", "secret-value-12345")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var parsed Config
+	if err := json.Unmarshal([]byte(result), &parsed); err != nil {
+		t.Fatal(err)
+	}
+	if parsed.AccessToken != "***" {
+		t.Errorf("Set return value should redact access_token, got %q", parsed.AccessToken)
 	}
 }

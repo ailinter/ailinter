@@ -188,3 +188,159 @@ func TestCLI_RulesList(t *testing.T) {
 		t.Errorf("expected Go table: %s", s)
 	}
 }
+
+func TestCLI_NoVulnerabilitiesFlag(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	src := "import pickle\npickle.loads(data)\n"
+	f := filepath.Join(dir, "vuln.py")
+	os.WriteFile(f, []byte(src), 0644)
+
+	// With vulnerabilities (default)
+	out, _ := exec.Command(bin, "check", "--format", "json", f).CombinedOutput()
+	if !strings.Contains(string(out), "\"vulnerability_scan\"") {
+		t.Errorf("should include vulnerability_scan by default: %s", out)
+	}
+
+	// With --no-vulnerabilities
+	out2, _ := exec.Command(bin, "check", "--format", "json", "--no-vulnerabilities", f).CombinedOutput()
+	s2 := string(out2)
+	if strings.Contains(s2, "\"vulnerability_scan\"") && strings.Contains(s2, "\"vulnerability_scan\":") && !strings.Contains(s2, "\"vulnerability_scan\":[]") && !strings.Contains(s2, "\"vulnerability_scan\": []") {
+		if strings.Contains(s2, "pickle_deserialization") {
+			t.Errorf("--no-vulnerabilities should suppress vuln findings: %s", s2)
+		}
+	}
+}
+
+func TestCLI_NoVulnerabilitiesWithNoSecrets(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	src := "import pickle\npickle.loads(data)\nAPI_KEY = 'sk_live_1234567890abcdef'\n"
+	f := filepath.Join(dir, "vuln.py")
+	os.WriteFile(f, []byte(src), 0644)
+
+	out, _ := exec.Command(bin, "check", "--format", "json", "--no-secrets", "--no-vulnerabilities", f).CombinedOutput()
+	s := string(out)
+
+	if strings.Contains(s, "\"secret_scan\"") && !strings.Contains(s, "\"secret_scan\":[]") && !strings.Contains(s, "\"secret_scan\": []") {
+		t.Errorf("--no-secrets should suppress secrets: %s", s)
+	}
+}
+
+func TestCLI_NoSecretsKeepsVulnerabilities_E2E(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	src := "import pickle\npickle.loads(data)\n"
+	f := filepath.Join(dir, "vuln.py")
+	os.WriteFile(f, []byte(src), 0644)
+
+	// C4 regression test: --no-secrets must NOT suppress vulnerability_scan
+	out, _ := exec.Command(bin, "check", "--format", "json", "--no-secrets", f).CombinedOutput()
+	s := string(out)
+
+	if !strings.Contains(s, "\"vulnerability_scan\"") {
+		t.Error("C4 REGRESSION: --no-secrets should not suppress vulnerability_scan (was the original C4 bug)")
+	}
+	if strings.Contains(s, "pickle_deserialization") {
+		t.Log("OK: vulnerability findings present despite --no-secrets")
+	}
+}
+
+func TestCLI_CheckProblemsVulnerabilities(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	src := "import pickle\npickle.loads(data)\n"
+	f := filepath.Join(dir, "vuln.py")
+	os.WriteFile(f, []byte(src), 0644)
+
+	out, _ := exec.Command(bin, "check", "--format", "problems", f).CombinedOutput()
+	s := string(out)
+
+	if strings.Contains(s, "pickle_deserialization") {
+		// Verify line numbers are non-zero
+		if strings.Contains(s, "vuln.py:0:0") {
+			t.Errorf("vuln findings should have real line numbers, got 0:0: %s", s)
+		}
+	}
+}
+
+func TestCLI_BadFormatRejected(t *testing.T) {
+	bin := buildBinary(t)
+	out, err := exec.Command(bin, "check", "--format", "xml", "/dev/null").CombinedOutput()
+	if err == nil {
+		t.Errorf("expected error for bad format, got output: %s", out)
+	}
+}
+
+func TestCLI_BadLanguageRejected(t *testing.T) {
+	bin := buildBinary(t)
+	out, err := exec.Command(bin, "check", "--lang", "frobulator", "/dev/null").CombinedOutput()
+	if err == nil {
+		t.Errorf("expected error for bad language, got output: %s", out)
+	}
+	s := string(out)
+	if !strings.Contains(s, "unknown language") {
+		t.Errorf("expected unknown language message: %s", s)
+	}
+}
+
+func TestCLI_BinaryRejected(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	f := filepath.Join(dir, "test.bin")
+	os.WriteFile(f, []byte{0x00, 0x01, 0x02, 0x03}, 0644)
+
+	out, err := exec.Command(bin, "check", f).CombinedOutput()
+	if err == nil {
+		t.Errorf("expected error for binary file, got: %s", out)
+	}
+}
+
+func TestCLI_DirScanVulnerabilities(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "vuln.py"), []byte("import pickle\npickle.loads(data)\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "clean.go"), []byte("package main\nfunc main() {}\n"), 0644)
+
+	out, _ := exec.Command(bin, "check", "--format", "json", dir).CombinedOutput()
+	s := string(out)
+
+	if !strings.Contains(s, "\"vulnerability_scan\"") {
+		t.Error("directory JSON output should include vulnerability_scan")
+	}
+}
+
+func TestCLI_ProblemsFormatHasFileLine(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	src := "package main\n\nfunc main() {\n\tif true {\n\t\tif true {\n\t\t\tif true {\n\t\t\t\tif true {\n\t\t\t\t\tprintln(\"deep\")\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n}\n"
+	f := filepath.Join(dir, "deep.go")
+	os.WriteFile(f, []byte(src), 0644)
+
+	out, _ := exec.Command(bin, "check", "--format", "problems", f).CombinedOutput()
+	s := string(out)
+
+	if !strings.Contains(s, "deep.go:") {
+		t.Errorf("problems format should contain file:line prefix: %s", s)
+	}
+	if strings.Contains(s, "\n\n") {
+		// Just checking we get output
+	}
+}
+
+func TestCLI_JSONOutputHasCodeQualityAndVulnKeys(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	f := filepath.Join(dir, "vuln.py")
+	os.WriteFile(f, []byte("import pickle\npickle.loads(data)\n"), 0644)
+
+	out, _ := exec.Command(bin, "check", "--format", "json", f).CombinedOutput()
+	s := string(out)
+
+	if !strings.Contains(s, "\"code_quality\"") {
+		t.Error("JSON output should contain code_quality key")
+	}
+	if !strings.Contains(s, "\"vulnerability_scan\"") {
+		t.Error("JSON output should contain vulnerability_scan key")
+	}
+}

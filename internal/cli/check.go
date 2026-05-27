@@ -10,24 +10,38 @@ import (
 	"github.com/ailinter/ailinter/internal/analyzer"
 	"github.com/ailinter/ailinter/internal/config"
 	"github.com/ailinter/ailinter/internal/secrets"
+	"github.com/ailinter/ailinter/internal/vulnerability"
 
 	"github.com/spf13/cobra"
 )
 
+type checkOptions struct {
+	format            FormatMode
+	noSecrets         bool
+	noVulnerabilities bool
+	secretsOnly       bool
+	vulnerabilitiesOnly bool
+	langOverride      string
+}
+
 func CheckCommand() *cobra.Command {
 	var (
-		formatFlag    string
-		jsonFlag      bool
-		noSecrets     bool
-		langOverride  string
-		noGitignore   bool
+		formatFlag         string
+		jsonFlag           bool
+		noSecrets          bool
+		noVulnerabilities  bool
+		secretsOnly        bool
+		vulnerabilitiesOnly bool
+		langOverride       string
+		noGitignore        bool
 	)
 
 	cmd := &cobra.Command{
 		Use:   "check <file|dir>",
-		Short: "Analyze files for Code Quality issues and secrets",
+		Short: "Analyze files for Code Quality, secrets, and vulnerabilities",
 		Long: `Analyze source files for structural Code Quality issues (deep nesting, brain methods,
-bumpy roads, complex conditionals, etc.) and scan for hardcoded secrets.
+bumpy roads, complex conditionals, etc.), scan for hardcoded secrets, and
+detect security vulnerabilities (injection, XSS, deserialization, weak crypto, XXE).
 
 Returns a quality score from 0-100 and detailed findings with AI guidance.
 
@@ -38,130 +52,241 @@ Output formats:
   auto      Auto-detect based on terminal (default)
   human     Colored text for terminal display
   json      Structured JSON output
-  markdown  Markdown formatted (ideal for LLMs)`,
+  markdown  Markdown formatted (ideal for LLMs)
+  problems  GCC-style output for IDE problem matchers (VS Code)
+
+Targeted scans:
+  --secrets-only         Scan ONLY for secrets (skip code quality and vulnerabilities)
+  --vulnerabilities-only Scan ONLY for vulnerabilities (skip code quality and secrets)`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			target := args[0]
-
-			mode := ResolveFormat(formatFlag)
+			mode, err := ResolveFormatStrict(formatFlag)
+			if err != nil {
+				return err
+			}
 			if jsonFlag {
 				mode = FormatJSON
 			}
-
-			info, err := os.Stat(target)
-			if err != nil {
-				return fmt.Errorf("cannot access %s: %w", target, err)
+			if langOverride != "" && !isValidLanguageName(langOverride) {
+				return fmt.Errorf("unknown language: %s (valid: go, python, javascript, typescript, java, csharp, ruby, swift, kotlin, rust, cpp, c)", langOverride)
 			}
-
-			if info.IsDir() {
-				return checkDirectory(target, mode, noSecrets, langOverride, !noGitignore)
+			opts := checkOptions{
+				format:             mode,
+				noSecrets:          noSecrets,
+				noVulnerabilities:  noVulnerabilities,
+				secretsOnly:        secretsOnly,
+				vulnerabilitiesOnly: vulnerabilitiesOnly,
+				langOverride:       langOverride,
 			}
-			return checkFile(target, mode, noSecrets, langOverride)
+			return executeCheck(args[0], opts, !noGitignore)
 		},
 	}
 
-	cmd.Flags().StringVar(&formatFlag, "format", "", "Output format: auto, human, json, markdown")
+	cmd.Flags().StringVar(&formatFlag, "format", "", "Output format: auto, human, json, markdown, problems")
 	cmd.Flags().BoolVar(&jsonFlag, "json", false, "Output results as JSON")
 	cmd.Flags().Lookup("json").Hidden = true
 	cmd.Flags().BoolVar(&noSecrets, "no-secrets", false, "Skip secret scanning")
+	cmd.Flags().BoolVar(&noVulnerabilities, "no-vulnerabilities", false, "Skip vulnerability scanning")
+	cmd.Flags().BoolVar(&secretsOnly, "secrets-only", false, "Scan ONLY for secrets (skip code quality and vulnerabilities)")
+	cmd.Flags().BoolVar(&vulnerabilitiesOnly, "vulnerabilities-only", false, "Scan ONLY for vulnerabilities (skip code quality and secrets)")
 	cmd.Flags().StringVar(&langOverride, "lang", "", "Force language (auto-detected by default)")
 	cmd.Flags().BoolVar(&noGitignore, "no-gitignore", false, "Do not respect .gitignore patterns when scanning directories")
 
 	return cmd
 }
 
-func checkFile(path string, format FormatMode, noSecrets bool, langOverride string) error {
-	data, err := os.ReadFile(path)
+func executeCheck(target string, opts checkOptions, respectGitignore bool) error {
+	info, err := os.Stat(target)
 	if err != nil {
-		return fmt.Errorf("failed to read %s: %w", path, err)
+		return fmt.Errorf("cannot access %s: %w", target, err)
 	}
 
-	lang := langOverride
+	if info.IsDir() {
+		return checkDirectory(target, opts, respectGitignore)
+	}
+	return checkFile(target, opts)
+}
+
+func (opts checkOptions) detectLang(path string) string {
+	if opts.langOverride != "" {
+		return opts.langOverride
+	}
+	ext := filepath.Ext(path)
+	lang := analyzer.DetectedLanguage(ext)
 	if lang == "" {
-		ext := filepath.Ext(path)
-		lang = analyzer.DetectedLanguage(ext)
-		if lang == "" {
-			lang = "go"
-		}
+		lang = "go"
+	}
+	return lang
+}
+
+func checkFile(path string, opts checkOptions) error {
+	resolved, err := resolveSafePath(path)
+	if err != nil {
+		return err
 	}
 
-	thresholds := config.LoadProjectThresholds(path, lang)
-	result := analyzer.Analyze(path, string(data), lang, thresholds)
+	data, err := os.ReadFile(resolved)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", resolved, err)
+	}
 
-	if format == FormatJSON {
-		writeCombinedJSON(result, data, path)
-	} else {
-		writeResult(format, result)
-		if !noSecrets {
-			scanAndWriteSecrets(path, data, format)
-		}
+	if isBinary(data) {
+		return fmt.Errorf("cannot analyze binary file: %s", resolved)
+	}
+
+	if opts.secretsOnly {
+		scanAndWriteSecrets(resolved, data, opts.format)
+		return nil
+	}
+	if opts.vulnerabilitiesOnly {
+		vulnScanner := vulnerability.NewScanner()
+		vulnFindings := vulnScanner.Scan(string(data), resolved)
+		writeVulnerabilities(opts.format, resolved, vulnFindings)
+		return nil
+	}
+
+	lang := opts.detectLang(resolved)
+	thresholds := config.LoadProjectThresholds(resolved, lang)
+	result := analyzer.Analyze(resolved, string(data), lang, thresholds)
+
+	if opts.format == FormatJSON {
+		writeCombinedJSON(result, data, resolved, opts.noSecrets, opts.noVulnerabilities)
+		return nil
+	}
+
+	writeResult(opts.format, result)
+	if !opts.noSecrets {
+		scanAndWriteSecrets(resolved, data, opts.format)
+	}
+	if !opts.noVulnerabilities {
+		vulnScanner := vulnerability.NewScanner()
+		vulnFindings := vulnScanner.Scan(string(data), resolved)
+		writeVulnerabilities(opts.format, resolved, vulnFindings)
 	}
 
 	return nil
 }
 
-func checkDirectory(dir string, format FormatMode, noSecrets bool, langOverride string, respectGitignore bool) error {
-	var allResults []analyzer.QualityResult
-	var gitignorePatterns []string
-
-	if respectGitignore {
-		gitignorePatterns = loadGitignore(dir)
+func checkDirectory(dir string, opts checkOptions, respectGitignore bool) error {
+	resolvedDir, err := resolveSafePath(dir)
+	if err != nil {
+		return err
 	}
 
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			base := filepath.Base(path)
-			if strings.HasPrefix(base, ".") || base == "node_modules" || base == "vendor" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !isSourceFile(path) {
-			return nil
-		}
+	scanQuality := !opts.secretsOnly && !opts.vulnerabilitiesOnly
+	scanSecrets := !opts.noSecrets || opts.secretsOnly
+	scanVulns := !opts.noVulnerabilities || opts.vulnerabilitiesOnly
 
-		if len(gitignorePatterns) > 0 && isGitignored(path, dir, gitignorePatterns) {
-			return nil
-		}
+	ctx := &walkContext{
+		opts:           opts,
+		resolvedDir:    resolvedDir,
+		gitignorePats:  nil,
+		scanQuality:    scanQuality,
+		scanner:        nil,
+		vulnScanner:    nil,
+	}
+	if respectGitignore {
+		ctx.gitignorePats = loadGitignore(resolvedDir)
+	}
+	if scanSecrets {
+		ctx.scanner, _ = secrets.NewScanner()
+	}
+	if scanVulns {
+		ctx.vulnScanner = vulnerability.NewScanner()
+	}
 
-		data, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return nil
-		}
-
-		lang := langOverride
-		if lang == "" {
-			ext := filepath.Ext(path)
-			lang = analyzer.DetectedLanguage(ext)
-			if lang == "" {
-				lang = "go" // default language for config files, dotfiles, etc.
-			}
-		}
-
-		thresholds := config.LoadProjectThresholds(path, lang)
-		result := analyzer.Analyze(path, string(data), lang, thresholds)
-		allResults = append(allResults, result)
-
-		if !noSecrets {
-			scanAndWriteSecrets(path, data, format)
-		}
-		return nil
-	})
+	err = filepath.WalkDir(resolvedDir, ctx.walkFn)
 	if err != nil {
 		return fmt.Errorf("walk error: %w", err)
 	}
 
-	if format == FormatJSON {
-		writeJSONResults(allResults)
-	} else {
-		writeResults(format, allResults)
-		writeSummary(format, allResults)
+	ctx.writeResults()
+	return nil
+}
+
+type walkContext struct {
+	opts          checkOptions
+	resolvedDir   string
+	gitignorePats []string
+	scanQuality   bool
+	scanner       *secrets.Scanner
+	vulnScanner   *vulnerability.Scanner
+	allResults    []analyzer.QualityResult
+	allSecrets    []secrets.SecretFinding
+	allVulns      []vulnerability.Finding
+}
+
+func (ctx *walkContext) walkFn(path string, d os.DirEntry, err error) error {
+	if err != nil {
+		return err
+	}
+	if d.IsDir() {
+		base := filepath.Base(path)
+		if strings.HasPrefix(base, ".") || base == "node_modules" || base == "vendor" {
+			return filepath.SkipDir
+		}
+		return nil
+	}
+	if ctx.shouldSkipFile(path) {
+		return nil
 	}
 
+	data, readErr := os.ReadFile(path)
+	if readErr != nil {
+		return nil
+	}
+	if isBinary(data) {
+		return nil
+	}
+
+	if ctx.scanQuality {
+		lang := ctx.opts.detectLang(path)
+		thresholds := config.LoadProjectThresholds(path, lang)
+		result := analyzer.Analyze(path, string(data), lang, thresholds)
+		ctx.allResults = append(ctx.allResults, result)
+	}
+
+	if ctx.scanner != nil {
+		findings := ctx.scanner.ScanBytes(data, path)
+		ctx.allSecrets = append(ctx.allSecrets, findings...)
+	}
+	if ctx.vulnScanner != nil {
+		vulnFindings := ctx.vulnScanner.Scan(string(data), path)
+		ctx.allVulns = append(ctx.allVulns, vulnFindings...)
+	}
 	return nil
+}
+
+func (ctx *walkContext) shouldSkipFile(path string) bool {
+	return !isSourceFile(path) ||
+		(len(ctx.gitignorePats) > 0 && isGitignored(path, ctx.resolvedDir, ctx.gitignorePats))
+}
+
+func (ctx *walkContext) writeResults() {
+	if ctx.opts.secretsOnly {
+		if len(ctx.allSecrets) > 0 {
+			writeSecrets(ctx.opts.format, "<directory>", ctx.allSecrets)
+		}
+		return
+	}
+	if ctx.opts.vulnerabilitiesOnly {
+		if len(ctx.allVulns) > 0 {
+			writeVulnerabilities(ctx.opts.format, "<directory>", ctx.allVulns)
+		}
+		return
+	}
+	if ctx.opts.format == FormatJSON {
+		writeCombinedDirJSON(ctx.allResults, ctx.allSecrets, ctx.allVulns)
+		return
+	}
+	writeResults(ctx.opts.format, ctx.allResults)
+	if len(ctx.allSecrets) > 0 {
+		writeSecrets(ctx.opts.format, "<directory>", ctx.allSecrets)
+	}
+	if len(ctx.allVulns) > 0 {
+		writeVulnerabilities(ctx.opts.format, "<directory>", ctx.allVulns)
+	}
+	writeSummary(ctx.opts.format, ctx.allResults)
 }
 
 func scanAndWriteSecrets(path string, data []byte, format FormatMode) {
@@ -181,22 +306,31 @@ func scanAndWriteSecrets(path string, data []byte, format FormatMode) {
 	}
 }
 
+var sourceExts = map[string]bool{
+	".go": true, ".py": true, ".js": true, ".ts": true, ".tsx": true,
+	".java": true, ".rs": true, ".rb": true, ".c": true, ".cpp": true,
+	".h": true, ".hpp": true, ".cs": true, ".swift": true, ".kt": true,
+	".kts": true, ".scala": true, ".php": true, ".pl": true, ".sh": true,
+	".bash": true, ".tf": true, ".yaml": true, ".yml": true, ".toml": true,
+	".json": true, ".xml": true, ".html": true, ".css": true, ".sql": true,
+	".properties": true, ".ini": true, ".cfg": true, ".conf": true, ".env": true,
+}
+
+var sourceBases = map[string]bool{
+	".env": true, "Dockerfile": true, "Makefile": true,
+	".gitignore": true, ".gitattributes": true, ".npmrc": true,
+	".editorconfig": true, ".dockerignore": true,
+}
+
 func isSourceFile(path string) bool {
-	ext := filepath.Ext(path)
-	base := filepath.Base(path)
-	switch ext {
-	case ".go", ".py", ".js", ".ts", ".tsx", ".java", ".rs", ".rb",
-		".c", ".cpp", ".h", ".hpp", ".cs", ".swift", ".kt", ".kts", ".scala",
-		".php", ".pl", ".sh", ".bash", ".tf", ".yaml", ".yml", ".toml",
-		".json", ".xml", ".html", ".css", ".sql",
-		".properties", ".ini", ".cfg", ".conf", ".env":
+	if sourceExts[filepath.Ext(path)] {
 		return true
 	}
-	// Handle dotfiles without extensions: .env, .env.prod, .gitignore, Dockerfile, etc.
-	if base == ".env" || strings.HasPrefix(base, ".env.") || base == "Dockerfile" ||
-		strings.HasPrefix(base, "Dockerfile.") || base == "Makefile" ||
-		base == ".gitignore" || base == ".gitattributes" || base == ".npmrc" ||
-		base == ".editorconfig" || base == ".dockerignore" {
+	base := filepath.Base(path)
+	if sourceBases[base] {
+		return true
+	}
+	if strings.HasPrefix(base, ".env.") || strings.HasPrefix(base, "Dockerfile.") {
 		return true
 	}
 	return false
@@ -227,7 +361,6 @@ func isGitignored(path, root string, patterns []string) bool {
 		return false
 	}
 	for _, p := range patterns {
-		// Handle simple glob and prefix patterns
 		matched, _ := filepath.Match(p, filepath.Base(path))
 		if matched {
 			return true
@@ -236,10 +369,46 @@ func isGitignored(path, root string, patterns []string) bool {
 		if matched {
 			return true
 		}
-		// Check if the relative path starts with a directory pattern (e.g., "bin/")
 		if strings.HasSuffix(p, "/") && strings.HasPrefix(rel, p) {
 			return true
 		}
+	}
+	return false
+}
+
+func resolveSafePath(path string) (string, error) {
+	cleaned := filepath.Clean(path)
+	abs, err := filepath.Abs(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve path %s: %w", path, err)
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve path: %w", err)
+	}
+	return resolved, nil
+}
+
+func isBinary(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+	checkLen := 8000
+	if len(data) < checkLen {
+		checkLen = len(data)
+	}
+	for _, b := range data[:checkLen] {
+		if b == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func isValidLanguageName(lang string) bool {
+	switch lang {
+	case "go", "python", "javascript", "typescript", "java", "csharp", "ruby", "swift", "kotlin", "rust", "cpp", "c":
+		return true
 	}
 	return false
 }

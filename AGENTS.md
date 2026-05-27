@@ -4,10 +4,37 @@
 
 - **Code Quality is authoritative.** Treat it as the single source of truth for maintainability.
 - **Target Code Quality 100.** This is the standard for AI-friendly code.
-- **Safeguard all AI-touched code** before suggesting a commit — run `ailinter check` on every changed file.
+- **Safeguard all AI-touched code** before suggesting a commit — delegate to `@ailinter` sub-agent.
 - If Code Quality regresses or issues are detected, **refactor — don't declare done.**
-- Use `ailinter check` to guide **incremental, high-impact refactorings** in 3-5 small steps.
+- Use `@ailinter` sub-agent to guide **incremental, high-impact refactorings** in 3-5 small steps.
 - When in doubt, **call the appropriate ailinter MCP tool — don't guess.**
+
+---
+
+## Sub-Agent Delegation (Ailinter Scans)
+
+**Delegate all ailinter scanning to the `@ailinter` sub-agent.** This keeps scan output out of the main conversation context and provides consistent, parsed results.
+
+### When to invoke `@ailinter`:
+
+| Scenario | Command |
+|----------|---------|
+| Scan changed files before commit | `@ailinter scan <file1> <file2> ...` |
+| Full project health check | `@ailinter scan .` |
+| Per-file analysis before editing | `@ailinter analyze <file>` |
+| Secret scan on new code | `@ailinter secrets <file>` |
+| Vulnerability assessment | `@ailinter vulns <file>` |
+| Quick safety check | `@ailinter assess <file>` |
+
+### What `@ailinter` does:
+
+1. Runs `ailinter check <paths> --format problems --no-secrets` — code quality + vulnerabilities
+2. Runs `ailinter check <paths> --format problems --secrets-only` — secrets only
+3. Parses line-oriented results: code quality scores, vulnerability findings, secret detections
+4. Returns a concise structured summary (≤ 30 lines)
+4. Flags regressions from baseline scores
+
+**The sub-agent handles all scanning.** You receive only the summary — no raw JSON dumps, no false-positive noise from embedded test fixtures, no betterleaks.toml self-matches.
 
 ---
 

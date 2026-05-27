@@ -37,7 +37,7 @@ const defaultAgentsMD = "# AGENTS.md\n\n" +
 	"## Available MCP Tools\n\n" +
 	"| Tool | Purpose |\n" +
 	"|------|---------|\n" +
-	"| `analyze_code` | Full structural analysis: quality score (0-100), issues, severity, locations |\n" +
+	"| `analyze_code` | Full structural analysis + vulnerability detection: quality score (0-100), issues, severity, locations |\n" +
 	"| `scan_for_secrets` | Secret detection: AWS keys, API tokens, private keys, JWT, etc. |\n" +
 	"| `get_refactoring_strategy` | Pattern lookup: returns exact steps + examples for each issue |\n" +
 	"| `assess_file` | Quick classification: Go Ahead / Proceed with Care / Stop & Refactor |\n" +

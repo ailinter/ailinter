@@ -8,6 +8,7 @@ import (
 
 	"github.com/ailinter/ailinter/internal/analyzer"
 	"github.com/ailinter/ailinter/internal/secrets"
+	"github.com/ailinter/ailinter/internal/vulnerability"
 	"github.com/mattn/go-isatty"
 	"golang.org/x/term"
 )
@@ -37,41 +38,44 @@ func (f FormatMode) String() string {
 	}
 }
 
-func DetectFormat(flagValue string) FormatMode {
-	if flagValue != "" {
-		switch strings.ToLower(flagValue) {
-		case "json":
-			return FormatJSON
-		case "markdown", "md":
-			return FormatMarkdown
-		case "text", "human":
-			return FormatHuman
-		case "problems", "gcc", "vscode":
-			return FormatProblems
-		case "auto":
-			return FormatAuto
-		}
-	}
+var formatNames = map[string]FormatMode{
+	"json":     FormatJSON,
+	"md":       FormatMarkdown,
+	"markdown": FormatMarkdown,
+	"text":     FormatHuman,
+	"human":    FormatHuman,
+	"problems": FormatProblems,
+	"gcc":      FormatProblems,
+	"vscode":   FormatProblems,
+	"auto":     FormatAuto,
+}
 
-	if env := os.Getenv("CLI_FORMAT"); env != "" {
-		switch strings.ToLower(env) {
-		case "json":
-			return FormatJSON
-		case "markdown", "md":
-			return FormatMarkdown
-		case "text", "human":
-			return FormatHuman
-		case "problems", "gcc", "vscode":
-			return FormatProblems
-		}
-	}
+func lookupFormat(name string) (FormatMode, bool) {
+	mode, ok := formatNames[strings.ToLower(name)]
+	return mode, ok
+}
 
-	if env := os.Getenv("NO_COLOR"); env != "" {
-		return FormatJSON
-	}
-
+func autoDetect() FormatMode {
 	if isatty.IsTerminal(os.Stdout.Fd()) {
 		return FormatHuman
+	}
+	return FormatJSON
+}
+
+func DetectFormat(flagValue string) FormatMode {
+	if mode, ok := lookupFormat(flagValue); ok {
+		return mode
+	}
+	if os.Getenv("NO_COLOR") != "" {
+		return FormatJSON
+	}
+	if flagValue == "" {
+		if env := os.Getenv("CLI_FORMAT"); env != "" {
+			if mode, ok := lookupFormat(env); ok {
+				return mode
+			}
+		}
+		return autoDetect()
 	}
 	return FormatJSON
 }
@@ -79,12 +83,22 @@ func DetectFormat(flagValue string) FormatMode {
 func ResolveFormat(flagValue string) FormatMode {
 	mode := DetectFormat(flagValue)
 	if mode == FormatAuto {
-		if isatty.IsTerminal(os.Stdout.Fd()) {
-			return FormatHuman
-		}
-		return FormatJSON
+		return autoDetect()
 	}
 	return mode
+}
+
+func ResolveFormatStrict(flagValue string) (FormatMode, error) {
+	if flagValue == "" {
+		return autoDetect(), nil
+	}
+	if mode, ok := lookupFormat(flagValue); ok {
+		if mode == FormatAuto {
+			return autoDetect(), nil
+		}
+		return mode, nil
+	}
+	return FormatAuto, fmt.Errorf("unknown format: %s (valid: auto, human, json, markdown, problems)", flagValue)
 }
 
 func IsColorEnabled() bool {
@@ -158,6 +172,21 @@ func writeSecrets(format FormatMode, path string, findings []secrets.SecretFindi
 	}
 }
 
+func writeVulnerabilities(format FormatMode, path string, findings []vulnerability.Finding) {
+	if len(findings) == 0 {
+		return
+	}
+	switch format {
+	case FormatJSON:
+	case FormatMarkdown:
+		writeMarkdownVulnerabilities(path, findings)
+	case FormatProblems:
+		writeProblemsVulnerabilities(path, findings)
+	default:
+		writeHumanVulnerabilities(path, findings)
+	}
+}
+
 func writeSummary(format FormatMode, results []analyzer.QualityResult) {
 	switch format {
 	case FormatJSON, FormatProblems:
@@ -213,21 +242,46 @@ func writeJSONResult(result analyzer.QualityResult) {
 }
 
 func writeJSONResults(results []analyzer.QualityResult) {
+	output := combinedDirResult{CodeQuality: results}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	enc.Encode(results)
+	enc.Encode(output)
 }
 
 type combinedResult struct {
-	CodeQuality  analyzer.QualityResult  `json:"code_quality"`
-	SecretScan   []secrets.SecretFinding `json:"secret_scan,omitempty"`
+	CodeQuality        analyzer.QualityResult     `json:"code_quality"`
+	SecretScan         []secrets.SecretFinding     `json:"secret_scan,omitempty"`
+	VulnerabilityScan  []vulnerability.Finding     `json:"vulnerability_scan,omitempty"`
 }
 
-func writeCombinedJSON(result analyzer.QualityResult, data []byte, path string) {
+type combinedDirResult struct {
+	CodeQuality        []analyzer.QualityResult    `json:"code_quality"`
+	SecretScan         []secrets.SecretFinding     `json:"secret_scan,omitempty"`
+	VulnerabilityScan  []vulnerability.Finding     `json:"vulnerability_scan,omitempty"`
+}
+
+func writeCombinedJSON(result analyzer.QualityResult, data []byte, path string, noSecrets bool, noVulnerabilities bool) {
 	output := combinedResult{CodeQuality: result}
-	scanner, err := secrets.NewScanner()
-	if err == nil {
-		output.SecretScan = scanner.ScanBytes(data, path)
+	if !noSecrets {
+		scanner, err := secrets.NewScanner()
+		if err == nil {
+			output.SecretScan = scanner.ScanBytes(data, path)
+		}
+	}
+	if !noVulnerabilities {
+		vulnScanner := vulnerability.NewScanner()
+		output.VulnerabilityScan = vulnScanner.Scan(string(data), path)
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.Encode(output)
+}
+
+func writeCombinedDirJSON(results []analyzer.QualityResult, secretsFindings []secrets.SecretFinding, vulnFindings []vulnerability.Finding) {
+	output := combinedDirResult{
+		CodeQuality:       results,
+		SecretScan:        secretsFindings,
+		VulnerabilityScan: vulnFindings,
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")

@@ -7,6 +7,7 @@ import (
 	"github.com/ailinter/ailinter/internal/analyzer"
 	"github.com/ailinter/ailinter/internal/parser"
 	"github.com/ailinter/ailinter/internal/secrets"
+	"github.com/ailinter/ailinter/internal/vulnerability"
 )
 
 var severityBlockMap = map[string]string{
@@ -303,4 +304,32 @@ func writeHumanSummary(results []analyzer.QualityResult) {
 			fmt.Printf("    %s\n", f)
 		}
 	}
+}
+
+func writeHumanVulnerabilities(path string, findings []vulnerability.Finding) {
+	fmt.Printf("\n%s  ·  vulnerabilities\n", path)
+	fmt.Printf("  %d vulnerability pattern%s detected\n", len(findings), maybePlural(len(findings)))
+
+	groups := groupVulnFindings(findings)
+	for _, sev := range sortedSeverityKeys() {
+		items := groups[sev]
+		if len(items) == 0 {
+			continue
+		}
+		for _, f := range items {
+			sevCol := severityColumn(f.Severity)
+			catCol := fmt.Sprintf("%-16s", f.Category)
+			nameCol := fmt.Sprintf("%-30s", f.RuleID)
+			fmt.Printf("  %s │ %s │ %s\n",
+				sevCol, catCol, nameCol)
+		}
+	}
+}
+
+func groupVulnFindings(findings []vulnerability.Finding) map[string][]vulnerability.Finding {
+	groups := map[string][]vulnerability.Finding{}
+	for _, f := range findings {
+		groups[f.Severity] = append(groups[f.Severity], f)
+	}
+	return groups
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/ailinter/ailinter/internal/analyzer"
 	"github.com/ailinter/ailinter/internal/secrets"
+	"github.com/ailinter/ailinter/internal/vulnerability"
 )
 
 func problemSeverity(severity string) string {
@@ -19,6 +20,8 @@ func problemSeverity(severity string) string {
 }
 
 func writeProblemsResult(result analyzer.QualityResult) {
+	fmt.Printf("# %s score=%d label=%s lines=%d lang=%s\n",
+		result.FilePath, result.Score, result.Label, result.LinesOfCode, result.Language)
 	for _, s := range result.Smells {
 		fmt.Printf("%s:%d:%d: %s: %s: %s\n",
 			result.FilePath, s.LineStart, 1,
@@ -31,5 +34,13 @@ func writeProblemsSecrets(path string, findings []secrets.SecretFinding) {
 		fmt.Printf("%s:%d:%d: %s: %s: %s\n",
 			path, f.Line, f.Column,
 			problemSeverity(f.Severity), f.RuleID, f.Description)
+	}
+}
+
+func writeProblemsVulnerabilities(path string, findings []vulnerability.Finding) {
+	for _, f := range findings {
+		fmt.Printf("%s:%d:%d: %s: %s: %s\n",
+			path, f.Line, f.Column,
+			problemSeverity(f.Severity), f.RuleID, f.Category)
 	}
 }

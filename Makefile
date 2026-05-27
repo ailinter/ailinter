@@ -42,6 +42,14 @@ install:
 clean:
 	rm -rf bin/ coverage.out coverage.html coverage-func.txt test-report.json test-report.html benchmarks/data/ benchmarks/repos/
 
+# Fetch the latest betterleaks rules from upstream.
+# Source: https://raw.githubusercontent.com/ailinter/ailinter/main/internal/secrets/betterleaks.toml
+update-betterleaks:
+	curl -sSL -o internal/secrets/betterleaks.toml \
+		https://raw.githubusercontent.com/betterleaks/betterleaks/main/betterleaks.toml
+	@echo "Fetched betterleaks.toml ($(shell wc -l < internal/secrets/betterleaks.toml) lines)"
+
+
 bench:
 	go test ./internal/... -bench=. -benchmem
 

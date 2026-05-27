@@ -142,20 +142,20 @@ func computeScore(smells []Smell, loc, fnCount int, coh CohesionResult, dups []D
 		base -= fnPenalty
 	}
 
-	// Per-smell penalties — capped at 2.5 total
+	// Per-smell penalties — capped at 3.0 total
 	smellPenalty := 0.0
 	for _, s := range smells {
 		switch s.Severity {
 		case "critical":
-			smellPenalty += 0.2
+			smellPenalty += 0.5
 		case "alert":
-			smellPenalty += 0.1
+			smellPenalty += 0.25
 		case "warning":
-			smellPenalty += 0.03
+			smellPenalty += 0.1
 		}
 	}
-	if smellPenalty > 2.5 {
-		smellPenalty = 2.5
+	if smellPenalty > 3.0 {
+		smellPenalty = 3.0
 	}
 	base -= smellPenalty
 

@@ -2,6 +2,7 @@ package mcp_test
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -66,11 +67,14 @@ func TestMCP_AnalyzeCode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	os.WriteFile("integration_test_file.go", []byte("package main\nfunc main() {}\n"), 0644)
+	defer os.Remove("integration_test_file.go")
+
 	result, err := c.CallTool(ctx, mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name: "analyze_code",
 			Arguments: map[string]interface{}{
-				"file_path": "../../cmd/ailinter/main.go",
+				"file_path": "integration_test_file.go",
 			},
 		},
 	})
@@ -134,11 +138,14 @@ func TestMCP_AssessFile(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	os.WriteFile("integration_test_assess.go", []byte("package main\nfunc main() {\n\tif true {\n\t\tif true {\n\t\t\tprintln(\"x\")\n\t\t}\n\t}\n}\n"), 0644)
+	defer os.Remove("integration_test_assess.go")
+
 	result, err := c.CallTool(ctx, mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name: "assess_file",
 			Arguments: map[string]interface{}{
-				"file_path": "../../cmd/ailinter/main.go",
+				"file_path": "integration_test_assess.go",
 			},
 		},
 	})

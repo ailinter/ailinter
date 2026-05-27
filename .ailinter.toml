@@ -51,3 +51,18 @@ extend = "default"
 [mcp]
 enabled_tools = ["*"]
 read_only = false
+
+# Self-scan exclusions — suppress self-referential findings from:
+# - betterleaks.toml: embedded secret detection rules match their own example patterns
+# - vulnerability/scanner.go: pattern definition reminder strings match their own regexes
+# - Secret scanner test files: contain example secrets to verify detection works
+[exclude]
+files = [
+    "internal/secrets/betterleaks.toml",
+    "internal/vulnerability/scanner.go",
+    "internal/secrets/scanner_test.go",
+    "internal/secrets/scanner_coverage_test.go",
+    "internal/secrets/scanner_internal_test.go",
+    "internal/secrets/benchmark_security_test.go",
+    "testdata/secrets/",
+]

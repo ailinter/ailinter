@@ -7,6 +7,7 @@ import (
 	"github.com/ailinter/ailinter/internal/analyzer"
 	"github.com/ailinter/ailinter/internal/parser"
 	"github.com/ailinter/ailinter/internal/secrets"
+	"github.com/ailinter/ailinter/internal/vulnerability"
 )
 
 func writeMarkdownResult(result analyzer.QualityResult) {
@@ -63,6 +64,18 @@ func writeMarkdownSummary(results []analyzer.QualityResult) {
 		for _, f := range highRisk {
 			fmt.Printf("  - `%s`\n", f)
 		}
+	}
+	fmt.Println()
+}
+
+func writeMarkdownVulnerabilities(path string, findings []vulnerability.Finding) {
+	fmt.Printf("\n### Shield Vulnerability Scan: %s (%d findings)\n\n", path, len(findings))
+	fmt.Println("| Severity | Category | Pattern | Description |")
+	fmt.Println("|----------|----------|---------|-------------|")
+	for _, f := range findings {
+		fmt.Printf("| %s | %s | %s | %s |\n",
+			f.Severity, f.Category, f.RuleID, f.Description)
+		fmt.Printf("  \n_%s_\n", strings.ReplaceAll(f.Reminder, "\n", " "))
 	}
 	fmt.Println()
 }

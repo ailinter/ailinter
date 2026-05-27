@@ -11,6 +11,7 @@ import (
 
 	"github.com/ailinter/ailinter/internal/analyzer"
 	"github.com/ailinter/ailinter/internal/secrets"
+	"github.com/ailinter/ailinter/internal/vulnerability"
 )
 
 func captureStdout(fn func()) string {
@@ -304,7 +305,8 @@ func TestWriteMarkdownSummary(t *testing.T) {
 
 func TestWriteProblemsResult(t *testing.T) {
 	result := analyzer.QualityResult{
-		FilePath: "src/main.go",
+		FilePath: "src/main.go", Score: 85, Label: analyzer.LabelProceedWithCare,
+		Language: "go", LinesOfCode: 200,
 		Smells: []analyzer.Smell{
 			{Name: "deep_nesting", Severity: "critical", LineStart: 5, Message: "Nesting depth 6"},
 			{Name: "brain_method", Severity: "warning", LineStart: 10, Message: "Function too long"},
@@ -316,13 +318,19 @@ func TestWriteProblemsResult(t *testing.T) {
 	})
 
 	lines := strings.Split(strings.TrimSpace(out), "\n")
-	if len(lines) != 2 {
-		t.Errorf("expected 2 problem lines, got %d", len(lines))
+	if len(lines) != 3 {
+		t.Errorf("expected 3 lines (1 comment + 2 problems), got %d", len(lines))
 	}
-	if !strings.Contains(lines[0], ": error:") {
+	if !strings.HasPrefix(lines[0], "#") {
+		t.Error("first line should be a comment with score info")
+	}
+	if !strings.Contains(lines[0], "score=85") {
+		t.Error("comment line should contain score")
+	}
+	if !strings.Contains(lines[1], ": error:") {
 		t.Error("critical should map to 'error' severity")
 	}
-	if !strings.Contains(lines[1], ": warning:") {
+	if !strings.Contains(lines[2], ": warning:") {
 		t.Error("warning should stay 'warning'")
 	}
 }
@@ -370,12 +378,14 @@ func TestWriteJSONResults(t *testing.T) {
 		writeJSONResults(results)
 	})
 
-	var parsed []analyzer.QualityResult
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
-		t.Fatalf("JSON array output must be valid: %v", err)
+	var parsed struct {
+		CodeQuality []analyzer.QualityResult `json:"code_quality"`
 	}
-	if len(parsed) != 2 {
-		t.Errorf("got %d results, want 2", len(parsed))
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("JSON output must be valid: %v", err)
+	}
+	if len(parsed.CodeQuality) != 2 {
+		t.Errorf("got %d results, want 2", len(parsed.CodeQuality))
 	}
 }
 
@@ -532,34 +542,35 @@ func TestCheckFile_Integration(t *testing.T) {
 	f := filepath.Join(dir, "main.go")
 	os.WriteFile(f, []byte("package main\nfunc main() {\n\tif true {\n\t\tprintln(\"nested\")\n\t}\n}\n"), 0644)
 
-	// Test human output
+	opts := checkOptions{format: FormatHuman, noSecrets: true, noVulnerabilities: true}
 	_ = captureStdout(func() {
-		checkFile(f, FormatHuman, true, "")
+		checkFile(f, opts)
 	})
 
-	// Test JSON output
+	opts.format = FormatJSON
 	_ = captureStdout(func() {
-		checkFile(f, FormatJSON, true, "")
+		checkFile(f, opts)
 	})
 
-	// Test markdown output
+	opts.format = FormatMarkdown
 	_ = captureStdout(func() {
-		checkFile(f, FormatMarkdown, true, "")
+		checkFile(f, opts)
 	})
 
-	// Test problems output
+	opts.format = FormatProblems
 	_ = captureStdout(func() {
-		checkFile(f, FormatProblems, true, "")
+		checkFile(f, opts)
 	})
 
-	// Test with lang override
+	opts.format = FormatHuman
+	opts.langOverride = "python"
 	_ = captureStdout(func() {
-		checkFile(f, FormatHuman, true, "python")
+		checkFile(f, opts)
 	})
 }
 
 func TestCheckFile_NotFound(t *testing.T) {
-	err := checkFile("/nonexistent/file.go", FormatHuman, true, "")
+	err := checkFile("/nonexistent/file.go", checkOptions{format: FormatHuman, noSecrets: true})
 	if err == nil {
 		t.Error("expected error for nonexistent file")
 	}
@@ -572,18 +583,14 @@ func TestCheckDirectory_Integration(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".hidden"), 0755)
 	os.WriteFile(filepath.Join(dir, ".hidden", "secret.go"), []byte("package hidden\nfunc f() {}\n"), 0644)
 
-	_ = captureStdout(func() {
-		checkDirectory(dir, FormatHuman, true, "", false)
-	})
-	_ = captureStdout(func() {
-		checkDirectory(dir, FormatJSON, true, "", false)
-	})
-	_ = captureStdout(func() {
-		checkDirectory(dir, FormatMarkdown, true, "", false)
-	})
-	_ = captureStdout(func() {
-		checkDirectory(dir, FormatProblems, true, "", false)
-	})
+	opts := checkOptions{format: FormatHuman, noSecrets: true, noVulnerabilities: true}
+	_ = captureStdout(func() { checkDirectory(dir, opts, false) })
+	opts.format = FormatJSON
+	_ = captureStdout(func() { checkDirectory(dir, opts, false) })
+	opts.format = FormatMarkdown
+	_ = captureStdout(func() { checkDirectory(dir, opts, false) })
+	opts.format = FormatProblems
+	_ = captureStdout(func() { checkDirectory(dir, opts, false) })
 }
 
 func TestGroupSmellsBySeverity(t *testing.T) {
@@ -668,4 +675,248 @@ func TestRenderGroupedSmells(t *testing.T) {
 	_ = captureStdout(func() {
 		renderGroupedSmells(groups)
 	})
+}
+
+func TestWriteHumanVulnerabilities(t *testing.T) {
+	findings := []vulnerability.Finding{
+		{RuleID: "pickle_deserialization", Category: "deserialization", Severity: "critical", Description: "Unsafe pickle usage", Line: 5, Column: 1, Reminder: "Use JSON instead."},
+		{RuleID: "eval_injection", Category: "injection", Severity: "critical", Description: "eval() usage", Line: 10, Column: 1, Reminder: "Use ast.literal_eval."},
+		{RuleID: "innerHTML_xss", Category: "xss", Severity: "critical", Description: "innerHTML assignment", Line: 15, Column: 1, Reminder: "Use textContent."},
+	}
+
+	out := captureStdout(func() {
+		writeHumanVulnerabilities("test.py", findings)
+	})
+
+	if !strings.Contains(out, "test.py") {
+		t.Error("human vuln output should contain file path")
+	}
+	if !strings.Contains(out, "pickle_deserialization") {
+		t.Error("human vuln output should contain rule ID")
+	}
+	if !strings.Contains(out, "deserialization") {
+		t.Error("human vuln output should contain category")
+	}
+}
+
+func TestWriteHumanVulnerabilities_Empty(t *testing.T) {
+	out := captureStdout(func() {
+		writeHumanVulnerabilities("empty.py", nil)
+	})
+	if strings.Contains(out, "pickle") {
+		t.Error("empty findings should not produce output")
+	}
+}
+
+func TestWriteMarkdownVulnerabilities(t *testing.T) {
+	findings := []vulnerability.Finding{
+		{RuleID: "os_system_injection", Category: "injection", Severity: "critical", Description: "os.system() call detected", Line: 3, Column: 5, Reminder: "Use subprocess.run with list args."},
+	}
+
+	out := captureStdout(func() {
+		writeMarkdownVulnerabilities("test.py", findings)
+	})
+
+	if !strings.Contains(out, "test.py") {
+		t.Error("markdown vuln output should contain file path")
+	}
+	if !strings.Contains(out, "os_system_injection") {
+		t.Error("markdown vuln output should contain rule ID")
+	}
+	if !strings.Contains(out, "injection") {
+		t.Error("markdown vuln output should contain category")
+	}
+	if !strings.Contains(out, "subprocess.run") {
+		t.Error("markdown vuln output should contain reminder")
+	}
+}
+
+func TestWriteMarkdownVulnerabilities_Empty(t *testing.T) {
+	out := captureStdout(func() {
+		writeMarkdownVulnerabilities("empty.py", nil)
+	})
+	if !strings.Contains(out, "0 findings") {
+		t.Errorf("empty findings should show 0 count, got %q", out)
+	}
+}
+
+func TestWriteProblemsVulnerabilities(t *testing.T) {
+	findings := []vulnerability.Finding{
+		{RuleID: "eval_injection", Category: "injection", Severity: "critical", Description: "eval() call", Line: 42, Column: 10, Reminder: "Use safe parser."},
+	}
+
+	out := captureStdout(func() {
+		writeProblemsVulnerabilities("test.py", findings)
+	})
+
+	if !strings.Contains(out, "test.py:42:10") {
+		t.Errorf("problems format should contain file:line:col, got %q", out)
+	}
+	if !strings.Contains(out, "eval_injection") {
+		t.Error("problems format should contain rule ID")
+	}
+	if !strings.Contains(out, "injection") {
+		t.Error("problems format should contain category")
+	}
+}
+
+func TestWriteProblemsVulnerabilities_Alert(t *testing.T) {
+	findings := []vulnerability.Finding{
+		{RuleID: "weak_hash_md5", Category: "crypto", Severity: "alert", Description: "MD5 usage", Line: 1, Column: 1, Reminder: "Use SHA-256."},
+		{RuleID: "path_traversal", Category: "injection", Severity: "warning", Description: "Path join", Line: 3, Column: 1, Reminder: "Validate paths."},
+	}
+
+	out := captureStdout(func() {
+		writeProblemsVulnerabilities("test.go", findings)
+	})
+
+	if !strings.Contains(out, "test.go:1:1: warning: weak_hash_md5") {
+		t.Errorf("alert severity should map to 'warning' in problems format, got %q", out)
+	}
+	if !strings.Contains(out, "test.go:3:1: warning: path_traversal") {
+		t.Errorf("warning severity should stay 'warning', got %q", out)
+	}
+}
+
+func TestWriteVulnerabilities_Dispatch(t *testing.T) {
+	findings := []vulnerability.Finding{
+		{RuleID: "eval_injection", Category: "injection", Severity: "critical", Description: "eval() call", Line: 1, Column: 1, Reminder: "Use safe parser."},
+	}
+
+	formats := []FormatMode{FormatHuman, FormatMarkdown, FormatProblems}
+	for _, f := range formats {
+		out := captureStdout(func() {
+			writeVulnerabilities(f, "test.py", findings)
+		})
+		if !strings.Contains(out, "eval_injection") {
+			t.Errorf("format %v should include rule ID", f)
+		}
+	}
+
+	// JSON format should NOT produce output (findings are embedded in combined JSON)
+	out := captureStdout(func() {
+		writeVulnerabilities(FormatJSON, "test.py", findings)
+	})
+	if strings.Contains(out, "eval_injection") {
+		t.Error("JSON format should not output vuln findings via writeVulnerabilities")
+	}
+}
+
+func TestWriteVulnerabilities_Empty(t *testing.T) {
+	var empty []vulnerability.Finding
+	for _, f := range []FormatMode{FormatHuman, FormatMarkdown, FormatProblems, FormatJSON} {
+		out := captureStdout(func() {
+			writeVulnerabilities(f, "test.py", empty)
+		})
+		if out != "" {
+			t.Errorf("empty findings should produce no output for format %v, got %q", f, out)
+		}
+	}
+}
+
+func TestGroupVulnFindings(t *testing.T) {
+	findings := []vulnerability.Finding{
+		{RuleID: "a", Severity: "critical"},
+		{RuleID: "b", Severity: "critical"},
+		{RuleID: "c", Severity: "alert"},
+		{RuleID: "d", Severity: "warning"},
+		{RuleID: "e", Severity: "alert"},
+	}
+
+	groups := groupVulnFindings(findings)
+	if len(groups["critical"]) != 2 {
+		t.Errorf("expected 2 critical, got %d", len(groups["critical"]))
+	}
+	if len(groups["alert"]) != 2 {
+		t.Errorf("expected 2 alert, got %d", len(groups["alert"]))
+	}
+	if len(groups["warning"]) != 1 {
+		t.Errorf("expected 1 warning, got %d", len(groups["warning"]))
+	}
+}
+
+func TestWriteCombinedJSON_NoVulnerabilities(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "test.py")
+	os.WriteFile(f, []byte("import pickle\npickle.loads(data)\n"), 0644)
+	src := "import pickle\npickle.loads(data)\n"
+
+	result := analyzer.QualityResult{Score: 80, Label: "Proceed with Care", FilePath: f, Language: "python", LinesOfCode: 2}
+
+	// With vulnerabilities disabled
+	out := captureStdout(func() {
+		writeCombinedJSON(result, []byte(src), f, true, true)
+	})
+	if strings.Contains(out, "pickle_deserialization") {
+		t.Error("vulnerability findings should NOT appear when noVulnerabilities=true")
+	}
+
+	// With vulnerabilities enabled
+	out2 := captureStdout(func() {
+		writeCombinedJSON(result, []byte(src), f, true, false)
+	})
+	if !strings.Contains(out2, "pickle_deserialization") {
+		t.Error("vulnerability findings SHOULD appear when noVulnerabilities=false")
+	}
+}
+
+func TestWriteCombinedJSON_NoSecretsKeepsVulns(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "test.py")
+	os.WriteFile(f, []byte("import pickle\npickle.loads(data)\n"), 0644)
+	src := "import pickle\npickle.loads(data)\n"
+
+	result := analyzer.QualityResult{Score: 80, Label: "Proceed with Care", FilePath: f, Language: "python", LinesOfCode: 2}
+
+	// --no-secrets: secrets disabled, vulns enabled
+	out := captureStdout(func() {
+		writeCombinedJSON(result, []byte(src), f, true, false)
+	})
+
+	if strings.Contains(out, "\"secret_scan\"") && !strings.Contains(out, "\"secret_scan\":null") && !strings.Contains(out, "\"secret_scan\":[]") && !strings.Contains(out, "\"secret_scan\": []") {
+		// secret_scan might be omitted or null when no secrets found — that's fine
+	}
+	if !strings.Contains(out, "pickle_deserialization") {
+		t.Error("C4 REGRESSION: vulnerability_scan should have findings even when noSecrets=true")
+	}
+}
+
+func TestWriteCombinedJSON_WithVulnerabilityContent(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "vuln.py")
+	src := "import pickle\npickle.loads(data)\n"
+	os.WriteFile(f, []byte(src), 0644)
+
+	result := analyzer.QualityResult{Score: 80, Label: "Proceed with Care", FilePath: f, Language: "python", LinesOfCode: 2}
+
+	out := captureStdout(func() {
+		writeCombinedJSON(result, []byte(src), f, false, false)
+	})
+
+	if !strings.Contains(out, "pickle_deserialization") {
+		t.Error("JSON output should contain pickle_deserialization finding")
+	}
+	if !strings.Contains(out, "\"vulnerability_scan\"") {
+		t.Error("JSON output should have vulnerability_scan key")
+	}
+}
+
+func TestWriteJSONResults_WrapsInObject(t *testing.T) {
+	results := []analyzer.QualityResult{
+		{Score: 95, Label: "Go Ahead", FilePath: "a.go", Language: "go", LinesOfCode: 30},
+	}
+
+	out := captureStdout(func() {
+		writeJSONResults(results)
+	})
+
+	var parsed struct {
+		CodeQuality []analyzer.QualityResult `json:"code_quality"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("JSON must be valid wrapped object: %v\nRaw: %s", err, out)
+	}
+	if len(parsed.CodeQuality) != 1 {
+		t.Errorf("expected 1 result, got %d", len(parsed.CodeQuality))
+	}
 }

@@ -23,7 +23,8 @@ func TestDetectedLanguage_All(t *testing.T) {
 		{".cc", "cpp"}, {".cxx", "cpp"}, {".c", "c"},
 		{".h", "cpp"}, {".hpp", "cpp"}, {".swift", "swift"},
 		{".kt", "kotlin"}, {".kts", "kotlin"}, {".cs", "csharp"},
-		{".html", ""}, {".css", ""}, {".unknown", ""}, {"", ""},
+		{".yaml", "yaml"}, {".yml", "yaml"}, {".html", "html"}, {".htm", "html"},
+		{".css", ""}, {".unknown", ""}, {"", ""},
 	}
 	for _, tc := range cases {
 		got := parser.DetectedLanguage(tc.ext)

@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,13 +11,15 @@ import (
 
 func TestHandleAnalyzeCode_Valid(t *testing.T) {
 	dir := t.TempDir()
-	f := filepath.Join(dir, "test.go")
-	os.WriteFile(f, []byte("package main\nfunc main() {\n\tif true {\n\t\tprintln(\"nested\")\n\t}\n}\n"), 0644)
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+	os.WriteFile("test.go", []byte("package main\nfunc main() {\n\tif true {\n\t\tprintln(\"nested\")\n\t}\n}\n"), 0644)
 
 	result, err := handleAnalyzeCode(context.Background(), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"file_path": f,
+				"file_path": "test.go",
 			},
 		},
 	})
@@ -207,12 +208,14 @@ func TestHandleGetRefactoringStrategy_InvalidArgs(t *testing.T) {
 
 func TestHandleAssessFile_Valid(t *testing.T) {
 	dir := t.TempDir()
-	f := filepath.Join(dir, "test.go")
-	os.WriteFile(f, []byte("package main\nfunc main() {}\n"), 0644)
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+	os.WriteFile("test.go", []byte("package main\nfunc main() {}\n"), 0644)
 
 	result, err := handleAssessFile(context.Background(), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
-			Arguments: map[string]interface{}{"file_path": f},
+			Arguments: map[string]interface{}{"file_path": "test.go"},
 		},
 	})
 	if err != nil {

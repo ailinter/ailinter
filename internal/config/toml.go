@@ -114,6 +114,65 @@ func findConfig(dir string) string {
 	}
 }
 
+func LoadProjectConfigFile(cwd string) *ProjectConfig {
+	cfgPath := findConfig(cwd)
+	if cfgPath == "" {
+		return nil
+	}
+
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		return nil
+	}
+
+	var uc UserConfig
+	if err := toml.Unmarshal(data, &uc); err != nil {
+		return nil
+	}
+
+	pc := &ProjectConfig{
+		Path:    cfgPath,
+		Extends: uc.Extends,
+	}
+	if uc.Rules.DeepNesting != nil {
+		w := uc.Rules.DeepNesting.Warning
+		pc.Rules.DeepNesting = &w
+	}
+	if uc.Rules.BrainMethod != nil {
+		w := uc.Rules.BrainMethod.WarningLines
+		pc.Rules.BrainMethod = &w
+	}
+	if uc.Rules.FileBloat != nil {
+		w := uc.Rules.FileBloat.WarningLines
+		pc.Rules.FileBloat = &w
+	}
+	if uc.Rules.CyclomaticComplexity != nil {
+		w := uc.Rules.CyclomaticComplexity.Warning
+		pc.Rules.CyclomaticComplexity = &w
+	}
+	if uc.Rules.BumpyRoad != nil {
+		w := uc.Rules.BumpyRoad.BumpsWarning
+		pc.Rules.BumpyRoad = &w
+	}
+	if uc.Rules.LongParameterList != nil {
+		w := uc.Rules.LongParameterList.Warning
+		pc.Rules.LongParameterList = &w
+	}
+	if uc.Rules.ComplexConditional != nil {
+		w := uc.Rules.ComplexConditional.BranchesWarning
+		pc.Rules.ComplexConditional = &w
+	}
+	if uc.Rules.LongSwitch != nil {
+		w := uc.Rules.LongSwitch.Warning
+		pc.Rules.LongSwitch = &w
+	}
+	if uc.Rules.ExcessiveComments != nil {
+		r := uc.Rules.ExcessiveComments.Ratio
+		pc.Rules.ExcessiveComments = &r
+	}
+	return pc
+}
+
 func mergeOverrides(t *parser.Thresholds, uc *UserConfig) {
 	if uc.Rules.DeepNesting != nil {
 		r := uc.Rules.DeepNesting
