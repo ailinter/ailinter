@@ -63,7 +63,7 @@ USER ailinter
 EXPOSE 4317
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD ailinter version || exit 1
+    CMD ailinter --version || exit 1
 
 ENTRYPOINT ["ailinter"]
 CMD ["mcp"]
