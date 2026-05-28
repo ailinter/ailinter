@@ -85,9 +85,7 @@ func TestLoadOrCreateInstallID_NoConfigDir(t *testing.T) {
 }
 
 func TestInit_AlreadyCalled(t *testing.T) {
-	origOnce := initOnce
 	initOnce = sync.Once{}
-	defer func() { initOnce = origOnce }()
 
 	origEnabled := IsEnabled
 	IsEnabled = false
@@ -116,9 +114,7 @@ func TestInit_AlreadyCalled(t *testing.T) {
 }
 
 func TestInit_WithDisabledTelemetry(t *testing.T) {
-	origOnce := initOnce
 	initOnce = sync.Once{}
-	defer func() { initOnce = origOnce }()
 
 	origEnabled := IsEnabled
 	IsEnabled = false
@@ -137,9 +133,7 @@ func TestInit_WithDisabledTelemetry(t *testing.T) {
 }
 
 func TestShutdown_Twice(t *testing.T) {
-	origOnce := initOnce
 	initOnce = sync.Once{}
-	defer func() { initOnce = origOnce }()
 
 	origVersion := Version
 	Version = "test-shutdown"
@@ -166,9 +160,7 @@ func TestShutdown_Twice(t *testing.T) {
 }
 
 func TestInit_ResourceError(t *testing.T) {
-	origOnce := initOnce
 	initOnce = sync.Once{}
-	defer func() { initOnce = origOnce }()
 
 	origEnabled := IsEnabled
 	IsEnabled = false
