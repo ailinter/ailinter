@@ -62,6 +62,7 @@ func initCLIMetrics(m metric.Meter) {
 func baseAttrs(extra ...attribute.KeyValue) []attribute.KeyValue {
 	attrs := []attribute.KeyValue{
 		attribute.String("version", Version),
+		attribute.String("client.type", clientType()),
 	}
 	attrs = append(attrs, extra...)
 	return attrs

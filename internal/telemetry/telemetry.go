@@ -27,6 +27,7 @@ var (
 	InstallID string
 	IsEnabled bool
 	Version   string
+	FirstRun  bool
 
 	shutdownFn func(context.Context) error
 	initOnce   sync.Once
@@ -49,7 +50,9 @@ func Init(ctx context.Context) {
 			return
 		}
 
-		InstallID = loadOrCreateInstallID()
+		var first bool
+		InstallID, first = loadOrCreateInstallID()
+		FirstRun = first
 
 		res, err := resource.New(ctx,
 			resource.WithAttributes(
@@ -58,6 +61,7 @@ func Init(ctx context.Context) {
 				semconv.OSName(runtime.GOOS),
 				semconv.HostArchKey.String(runtime.GOARCH),
 				attribute.String("install.id", InstallID),
+				attribute.String("go.version", runtime.Version()),
 			),
 		)
 		if err != nil {
@@ -97,25 +101,25 @@ func resolveEnabled() bool {
 	return true
 }
 
-func loadOrCreateInstallID() string {
+func loadOrCreateInstallID() (string, bool) {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
-		return ""
+		return "", false
 	}
 	dir := filepath.Join(configDir, "ailinter")
 	idFile := filepath.Join(dir, "install_id")
 	if data, err := os.ReadFile(idFile); err == nil {
 		hash := sha256.Sum256(data)
-		return hex.EncodeToString(hash[:16])
+		return hex.EncodeToString(hash[:16]), false
 	}
 	id := make([]byte, 16)
 	if _, err := rand.Read(id); err != nil {
-		return ""
+		return "", false
 	}
 	os.MkdirAll(dir, 0700)
 	os.WriteFile(idFile, id, 0600)
 	hash := sha256.Sum256(id)
-	return hex.EncodeToString(hash[:16])
+	return hex.EncodeToString(hash[:16]), true
 }
 
 func initMetrics(m metric.Meter) {

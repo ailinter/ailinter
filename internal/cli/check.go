@@ -114,7 +114,32 @@ Token estimation (--estimate-tokens):
 }
 
 func executeCheck(target string, opts checkOptions, respectGitignore bool) error {
-	telemetry.RecordCLIInvocation("check")
+	flags := map[string]string{}
+	if opts.noSecrets {
+		flags["no-secrets"] = "true"
+	}
+	if opts.noVulnerabilities {
+		flags["no-vulnerabilities"] = "true"
+	}
+	if opts.secretsOnly {
+		flags["secrets-only"] = "true"
+	}
+	if opts.vulnerabilitiesOnly {
+		flags["vulnerabilities-only"] = "true"
+	}
+	if opts.format != FormatAuto {
+		flags["format"] = opts.format.String()
+	}
+	if opts.langOverride != "" {
+		flags["lang"] = opts.langOverride
+	}
+	if opts.estimateTokens {
+		flags["estimate-tokens"] = "true"
+	}
+	if !opts.metaLint {
+		flags["no-meta-lint"] = "true"
+	}
+	telemetry.RecordCLIInvocationWithFlags("check", flags)
 
 	info, err := os.Stat(target)
 	if err != nil {
@@ -230,6 +255,7 @@ func checkDirectory(dir string, opts checkOptions, respectGitignore bool) error 
 		scanQuality:   scanQuality,
 		scanner:       nil,
 		vulnScanner:   nil,
+		langCount:     make(map[string]int),
 	}
 	if respectGitignore {
 		ctx.gitignorePats = loadGitignore(resolvedDir)
@@ -246,6 +272,7 @@ func checkDirectory(dir string, opts checkOptions, respectGitignore bool) error 
 		return fmt.Errorf("walk error: %w", err)
 	}
 
+	telemetry.RecordDirScan(ctx.fileCount, ctx.langCount)
 	ctx.writeResults()
 	if opts.metaLint {
 		// Run meta-linters on the directory (Go mode)
@@ -267,6 +294,8 @@ type walkContext struct {
 	allResults    []analyzer.QualityResult
 	allSecrets    []secrets.SecretFinding
 	allVulns      []vulnerability.Finding
+	fileCount     int
+	langCount     map[string]int
 }
 
 func (ctx *walkContext) walkFn(path string, d os.DirEntry, err error) error {
@@ -294,6 +323,8 @@ func (ctx *walkContext) walkFn(path string, d os.DirEntry, err error) error {
 
 	if ctx.scanQuality {
 		lang := ctx.opts.detectLang(path)
+		ctx.fileCount++
+		ctx.langCount[lang]++
 		thresholds := config.LoadProjectThresholds(path, lang)
 		result := analyzer.Analyze(analyzer.SourceInput{FilePath: path, Source: string(data), Lang: lang}, thresholds)
 		ctx.allResults = append(ctx.allResults, result)

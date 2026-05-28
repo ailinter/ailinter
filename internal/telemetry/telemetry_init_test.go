@@ -76,7 +76,7 @@ func TestLoadOrCreateInstallID_NoConfigDir(t *testing.T) {
 	InstallID = ""
 	defer func() { InstallID = orig }()
 
-	id := loadOrCreateInstallID()
+	id, _ := loadOrCreateInstallID()
 	if id == "" {
 		// This is valid when config dir doesn't exist or can't be created
 		return
@@ -202,6 +202,7 @@ func TestBaseAttrs(t *testing.T) {
 	t.Run("no extra attrs", func(t *testing.T) {
 		attrs := baseAttrs()
 		foundVersion := false
+		foundClientType := false
 		for _, a := range attrs {
 			if string(a.Key) == "version" {
 				foundVersion = true
@@ -209,12 +210,18 @@ func TestBaseAttrs(t *testing.T) {
 					t.Errorf("expected version=test-base-attrs, got %s", a.Value.AsString())
 				}
 			}
+			if string(a.Key) == "client.type" {
+				foundClientType = true
+			}
 		}
 		if !foundVersion {
 			t.Error("expected version attribute in baseAttrs")
 		}
-		if len(attrs) != 1 {
-			t.Errorf("expected 1 attribute, got %d", len(attrs))
+		if !foundClientType {
+			t.Error("expected client.type attribute in baseAttrs")
+		}
+		if len(attrs) != 2 {
+			t.Errorf("expected 2 attributes (version + client.type), got %d", len(attrs))
 		}
 	})
 
@@ -236,8 +243,8 @@ func TestBaseAttrs(t *testing.T) {
 		if attrMap["language"] != "go" {
 			t.Errorf("expected language=go, got %q", attrMap["language"])
 		}
-		if len(attrs) != 3 {
-			t.Errorf("expected 3 attributes, got %d", len(attrs))
+		if len(attrs) != 4 {
+			t.Errorf("expected 4 attributes (version + client.type + 2 extras), got %d", len(attrs))
 		}
 	})
 }

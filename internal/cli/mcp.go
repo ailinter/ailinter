@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/ailinter/ailinter/internal/mcp"
+	"github.com/ailinter/ailinter/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +28,9 @@ Add to your MCP configuration:
     }
   }`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if c := os.Getenv("AILINTER_MCP_CLIENT"); c != "" {
+				telemetry.SetMCPClient(c)
+			}
 			fmt.Fprintln(os.Stderr, "ailinter MCP server starting on stdio...")
 			return mcp.Serve(version)
 		},

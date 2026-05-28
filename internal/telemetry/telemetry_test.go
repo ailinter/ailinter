@@ -41,7 +41,7 @@ func TestResolveEnabled_Var_0(t *testing.T) {
 }
 
 func TestLoadOrCreateInstallID(t *testing.T) {
-	id := loadOrCreateInstallID()
+	id, _ := loadOrCreateInstallID()
 	if id == "" {
 		t.Skip("install ID generation might fail without config dir")
 		return
