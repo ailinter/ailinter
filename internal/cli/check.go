@@ -10,6 +10,7 @@ import (
 
 	"github.com/ailinter/ailinter/internal/analyzer"
 	"github.com/ailinter/ailinter/internal/config"
+	"github.com/ailinter/ailinter/internal/metalinter"
 	"github.com/ailinter/ailinter/internal/secrets"
 	"github.com/ailinter/ailinter/internal/telemetry"
 	"github.com/ailinter/ailinter/internal/vulnerability"
@@ -25,6 +26,7 @@ type checkOptions struct {
 	vulnerabilitiesOnly bool
 	langOverride        string
 	estimateTokens      bool
+	metaLint            bool
 }
 
 func CheckCommand() *cobra.Command {
@@ -37,6 +39,8 @@ func CheckCommand() *cobra.Command {
 		vulnerabilitiesOnly bool
 		langOverride        string
 		noGitignore         bool
+		estimateTokens      bool
+		metaLint            bool
 	)
 
 	cmd := &cobra.Command{
@@ -60,7 +64,12 @@ Output formats:
 
 Targeted scans:
   --secrets-only         Scan ONLY for secrets (skip code quality and vulnerabilities)
-  --vulnerabilities-only Scan ONLY for vulnerabilities (skip code quality and secrets)`,
+  --vulnerabilities-only Scan ONLY for vulnerabilities (skip code quality and secrets)
+
+Token estimation (--estimate-tokens):
+  After quality analysis, estimates AI token costs and potential savings
+  from refactoring to score 80+, with per-interaction and monthly
+  enterprise savings across Claude Opus 4, GPT-4.5, and Claude 3.5 Sonnet.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			mode, err := ResolveFormatStrict(formatFlag)
@@ -80,6 +89,8 @@ Targeted scans:
 				secretsOnly:         secretsOnly,
 				vulnerabilitiesOnly: vulnerabilitiesOnly,
 				langOverride:        langOverride,
+				estimateTokens:      estimateTokens,
+				metaLint:            metaLint,
 			}
 			return executeCheck(args[0], opts, !noGitignore)
 		},
@@ -94,6 +105,8 @@ Targeted scans:
 	cmd.Flags().BoolVar(&vulnerabilitiesOnly, "vulnerabilities-only", false, "Scan ONLY for vulnerabilities (skip code quality and secrets)")
 	cmd.Flags().StringVar(&langOverride, "lang", "", "Force language (auto-detected by default)")
 	cmd.Flags().BoolVar(&noGitignore, "no-gitignore", false, "Do not respect .gitignore patterns when scanning directories")
+	cmd.Flags().BoolVar(&estimateTokens, "estimate-tokens", false, "Show AI token cost estimation after analysis")
+	cmd.Flags().BoolVar(&metaLint, "meta-lint", false, "Run embedded meta-linters (go vet, staticcheck, gofmt, misspell, ineffassign)")
 
 	return cmd
 }
@@ -182,6 +195,17 @@ func checkFile(path string, opts checkOptions) error {
 		vulnFindings := vulnScanner.Scan(string(data), resolved)
 		writeVulnerabilities(opts.format, resolved, vulnFindings)
 	}
+	if opts.metaLint && ext == ".go" {
+		mlFindings, err := metalinter.LintGo([]string{resolved})
+		if err == nil && len(mlFindings) > 0 {
+			writeMetaLintFindings(opts.format, mlFindings)
+		}
+	}
+
+	if opts.estimateTokens {
+		estimator := analyzer.NewTokenEstimator(resolved, result.Score)
+		fmt.Print("\n" + estimator.FormatEstimateOutput())
+	}
 
 	telemetry.RecordDuration("check_file", lang, time.Since(start).Seconds())
 	return nil
@@ -221,6 +245,13 @@ func checkDirectory(dir string, opts checkOptions, respectGitignore bool) error 
 	}
 
 	ctx.writeResults()
+	if opts.metaLint {
+		// Run meta-linters on the directory (Go mode)
+		mlFindings, err := metalinter.LintGo([]string{resolvedDir})
+		if err == nil && len(mlFindings) > 0 {
+			writeMetaLintFindings(opts.format, mlFindings)
+		}
+	}
 	return nil
 }
 
@@ -307,6 +338,9 @@ func (ctx *walkContext) writeResults() {
 		writeVulnerabilities(ctx.opts.format, "<directory>", ctx.allVulns)
 	}
 	writeSummary(ctx.opts.format, ctx.allResults)
+	if ctx.opts.estimateTokens {
+		writeDirTokenEstimates(ctx.allResults)
+	}
 }
 
 func scanAndWriteSecrets(path string, data []byte, format FormatMode) {
@@ -433,4 +467,36 @@ func isValidLanguageName(lang string) bool {
 		return true
 	}
 	return false
+}
+
+func writeDirTokenEstimates(results []analyzer.QualityResult) {
+	var totalCurrent, totalAfter int64
+	for _, r := range results {
+		est := analyzer.NewTokenEstimator(r.FilePath, r.Score)
+		totalCurrent += int64(est.CurrentTokens())
+		totalAfter += int64(est.EstimatedTokensAfterRefactor())
+	}
+	savings := totalCurrent - totalAfter
+
+	fmt.Println()
+	fmt.Println("Token Savings Estimate (all files)")
+	fmt.Println("────────────────────────────────────")
+	fmt.Printf("Files scanned: %d\n", len(results))
+	fmt.Printf("Total current tokens: %d\n", totalCurrent)
+	fmt.Printf("After refactoring (est): %d\n", totalAfter)
+	fmt.Printf("Total tokens saved: %d\n\n", savings)
+
+	fmt.Println("Monthly (20 devs, 50 AI calls/day, 6 files read per call):")
+	models := []struct {
+		name string
+		cost float64
+	}{
+		{"Claude Opus 4", 15.00},
+		{"GPT-4.5", 10.00},
+		{"Claude 3.5 Sonnet", 3.00},
+	}
+	for _, m := range models {
+		monthly := float64(savings) / 1_000_000.0 * m.cost * 20.0 * 50.0 * 22.0 * 6.0
+		fmt.Printf("  %-20s $%.0f/month saved\n", m.name+":", monthly)
+	}
 }

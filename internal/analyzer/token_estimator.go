@@ -108,7 +108,6 @@ func (t *TokenEstimator) FormatEstimateOutput() string {
 	fileName := filepath.Base(t.FilePath)
 	currentTokens := t.CurrentTokens()
 	afterTokens := t.EstimatedTokensAfterRefactor()
-	savings := t.TokenSavingsPerRead()
 	pct := int(ReductionFactor(t.CurrentScore) * 100)
 
 	var out string
@@ -130,10 +129,9 @@ func (t *TokenEstimator) FormatEstimateOutput() string {
 	}
 
 	out += "\nHidden savings: Clean code needs ~40% fewer iterations.\n"
-	for _, model := range supportedModels {
-		total := t.IterationReductionSavings(model)
-		out += fmt.Sprintf("Total estimated savings: $%.0f/month (%s, including iteration reduction)\n", total, model.Name)
-	}
+	// Show headline total for best model (Opus 4)
+	opusTotal := t.IterationReductionSavings(supportedModels[0])
+	out += fmt.Sprintf("Total estimated savings: $%.0f/month (Claude Opus 4, including iteration reduction)\n", opusTotal)
 
 	return out
 }

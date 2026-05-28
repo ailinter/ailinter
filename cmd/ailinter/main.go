@@ -30,6 +30,7 @@ func main() {
 
 	root := newRootCommand()
 	root.AddCommand(cli.CheckCommand())
+	root.AddCommand(cli.ReportCommand())
 	root.AddCommand(cli.MCPCommand(version))
 	root.AddCommand(cli.InitCommand())
 	root.AddCommand(rulesCommand())

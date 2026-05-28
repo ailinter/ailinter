@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/ailinter/ailinter/internal/analyzer"
+	"github.com/ailinter/ailinter/internal/metalinter"
 	"github.com/ailinter/ailinter/internal/parser"
 	"github.com/ailinter/ailinter/internal/secrets"
 	"github.com/ailinter/ailinter/internal/vulnerability"
@@ -85,6 +86,25 @@ func writeMarkdownVulnerabilities(path string, findings []vulnerability.Finding)
 		fmt.Printf("| %s | %s | %s | %s |\n",
 			f.Severity, f.Category, f.RuleID, f.Description)
 		fmt.Printf("  \n_%s_\n", strings.ReplaceAll(f.Reminder, "\n", " "))
+	}
+	fmt.Println()
+}
+
+func writeMarkdownMetaLint(findings []metalinter.Finding) {
+	fmt.Printf("\n### Meta-Lint Findings (%d)\n\n", len(findings))
+	fmt.Println("| Tool | Code | Severity | File | Line | Message |")
+	fmt.Println("|------|------|----------|------|------|---------|")
+	for _, f := range findings {
+		loc := ""
+		if f.Line > 0 {
+			loc = fmt.Sprintf("%d", f.Line)
+			if f.Column > 0 {
+				loc = fmt.Sprintf("%d:%d", f.Line, f.Column)
+			}
+		}
+		msg := strings.ReplaceAll(f.Message, "|", "\\|")
+		fmt.Printf("| %s | %s | %s | %s | %s | %s |\n",
+			f.Tool, f.Code, f.Severity, f.File, loc, msg)
 	}
 	fmt.Println()
 }

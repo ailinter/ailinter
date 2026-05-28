@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ailinter/ailinter/internal/analyzer"
+	"github.com/ailinter/ailinter/internal/metalinter"
 	"github.com/ailinter/ailinter/internal/secrets"
 	"github.com/ailinter/ailinter/internal/vulnerability"
 	"github.com/mattn/go-isatty"
@@ -252,12 +253,14 @@ type combinedResult struct {
 	CodeQuality       analyzer.QualityResult  `json:"code_quality"`
 	SecretScan        []secrets.SecretFinding `json:"secret_scan,omitempty"`
 	VulnerabilityScan []vulnerability.Finding `json:"vulnerability_scan,omitempty"`
+	MetaLint          []metalinter.Finding    `json:"meta_lint,omitempty"`
 }
 
 type combinedDirResult struct {
 	CodeQuality       []analyzer.QualityResult `json:"code_quality"`
 	SecretScan        []secrets.SecretFinding  `json:"secret_scan,omitempty"`
 	VulnerabilityScan []vulnerability.Finding  `json:"vulnerability_scan,omitempty"`
+	MetaLint          []metalinter.Finding     `json:"meta_lint,omitempty"`
 }
 
 func writeCombinedJSON(result analyzer.QualityResult, data []byte, path string, noSecrets bool, noVulnerabilities bool) {
@@ -286,4 +289,33 @@ func writeCombinedDirJSON(results []analyzer.QualityResult, secretsFindings []se
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	enc.Encode(output)
+}
+
+// writeJSONMetaLint writes meta-lint findings as a standalone JSON array.
+func writeJSONMetaLint(findings []metalinter.Finding) {
+	output := struct {
+		MetaLint []metalinter.Finding `json:"meta_lint"`
+	}{MetaLint: findings}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.Encode(output)
+}
+
+// writeMetaLintFindings writes meta-lint findings in the requested format.
+func writeMetaLintFindings(format FormatMode, findings []metalinter.Finding) {
+	if len(findings) == 0 {
+		return
+	}
+	switch format {
+	case FormatJSON:
+		writeJSONMetaLint(findings)
+	case FormatMarkdown:
+		writeMarkdownMetaLint(findings)
+	case FormatProblems:
+		for _, f := range findings {
+			fmt.Println(f.ProblemsFormat())
+		}
+	default:
+		writeHumanMetaLint(findings)
+	}
 }

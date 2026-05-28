@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/ailinter/ailinter/internal/analyzer"
+	"github.com/ailinter/ailinter/internal/metalinter"
 	"github.com/ailinter/ailinter/internal/parser"
 	"github.com/ailinter/ailinter/internal/secrets"
 	"github.com/ailinter/ailinter/internal/vulnerability"
@@ -341,6 +342,43 @@ func groupVulnFindings(findings []vulnerability.Finding) map[string][]vulnerabil
 	groups := map[string][]vulnerability.Finding{}
 	for _, f := range findings {
 		groups[f.Severity] = append(groups[f.Severity], f)
+	}
+	return groups
+}
+
+func writeHumanMetaLint(findings []metalinter.Finding) {
+	fmt.Printf("\n  [meta-lint]\n")
+	groups := groupMetaLintFindings(findings)
+	for _, tool := range []string{"govet", "staticcheck", "gofmt", "misspell", "ineffassign"} {
+		items := groups[tool]
+		if len(items) == 0 {
+			continue
+		}
+		fmt.Printf("  %s: %d finding%s\n", tool, len(items), maybePlural(len(items)))
+		for _, f := range items {
+			loc := ""
+			if f.Line > 0 {
+				loc = fmt.Sprintf(" L%d", f.Line)
+				if f.Column > 0 {
+					loc = fmt.Sprintf(" L%d:%d", f.Line, f.Column)
+				}
+			}
+			codeCol := ""
+			if f.Code != "" {
+				codeCol = fmt.Sprintf(" [%s]", f.Code)
+			}
+			fmt.Printf("    %s%s %s%s\n", severityBlock(f.Severity), strings.ToUpper(f.Severity[0:1]), f.Message, codeCol)
+			if f.File != "" {
+				fmt.Printf("      └ %s%s\n", f.File, loc)
+			}
+		}
+	}
+}
+
+func groupMetaLintFindings(findings []metalinter.Finding) map[string][]metalinter.Finding {
+	groups := map[string][]metalinter.Finding{}
+	for _, f := range findings {
+		groups[f.Tool] = append(groups[f.Tool], f)
 	}
 	return groups
 }
