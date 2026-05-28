@@ -1,4 +1,4 @@
-.PHONY: build test lint clean run install test-report coverage-all coverage-check bench-compare
+.PHONY: build test lint clean run install test-report coverage-all coverage-check bench-compare check precommit
 
 NAME := ailinter
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "0.1.0-dev")
@@ -12,6 +12,14 @@ run: build
 
 test:
 	go test ./... -v -count=1
+
+# Run ailinter check with meta-linters before building/testing
+check:
+	./bin/ailinter check ./... --format problems
+
+# Pre-commit quality gate: must pass before every commit
+precommit: lint check
+	@echo "✅ Pre-commit checks passed"
 
 test-cover:
 	go test ./... -coverprofile=coverage.out -covermode=count
@@ -53,6 +61,7 @@ coverage-all: test-report
 
 lint:
 	go vet ./...
+	go fmt ./... > /dev/null 2>&1 && echo "✅ go fmt passed" || echo "⚠️  go fmt has changes"
 
 fmt:
 	go fmt ./...

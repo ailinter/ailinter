@@ -85,7 +85,7 @@ func runGoVetStaticcheck(pkgPaths []string) ([]Finding, error) {
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax |
 			packages.NeedTypes | packages.NeedTypesInfo | packages.NeedTypesSizes |
 			packages.NeedModule,
-		Tests: false,
+		Tests: true,
 	}
 
 	pkgs, err := packages.Load(cfg, pkgPaths...)

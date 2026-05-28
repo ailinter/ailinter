@@ -116,7 +116,7 @@ func TestCheckFileGofmt_NonGoFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("checkFileGofmt() err = %v", err)
 	}
-	// Non-Go content may parse without error (format.Source handles it) 
+	// Non-Go content may parse without error (format.Source handles it)
 	// or return a finding. Either is acceptable behavior.
 	_ = finding // behavior is implementation-defined for non-.go files
 }

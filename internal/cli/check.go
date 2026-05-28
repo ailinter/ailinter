@@ -41,6 +41,7 @@ func CheckCommand() *cobra.Command {
 		noGitignore         bool
 		estimateTokens      bool
 		metaLint            bool
+		noMetaLint          bool
 	)
 
 	cmd := &cobra.Command{
@@ -90,7 +91,7 @@ Token estimation (--estimate-tokens):
 				vulnerabilitiesOnly: vulnerabilitiesOnly,
 				langOverride:        langOverride,
 				estimateTokens:      estimateTokens,
-				metaLint:            metaLint,
+				metaLint:            metaLint && !noMetaLint,
 			}
 			return executeCheck(args[0], opts, !noGitignore)
 		},
@@ -106,7 +107,8 @@ Token estimation (--estimate-tokens):
 	cmd.Flags().StringVar(&langOverride, "lang", "", "Force language (auto-detected by default)")
 	cmd.Flags().BoolVar(&noGitignore, "no-gitignore", false, "Do not respect .gitignore patterns when scanning directories")
 	cmd.Flags().BoolVar(&estimateTokens, "estimate-tokens", false, "Show AI token cost estimation after analysis")
-	cmd.Flags().BoolVar(&metaLint, "meta-lint", false, "Run embedded meta-linters (go vet, staticcheck, gofmt, misspell, ineffassign)")
+	cmd.Flags().BoolVar(&metaLint, "meta-lint", true, "Run embedded meta-linters (go vet, staticcheck, gofmt, misspell, ineffassign) [default: on]")
+	cmd.Flags().BoolVar(&noMetaLint, "no-meta-lint", false, "Skip embedded meta-linters")
 
 	return cmd
 }

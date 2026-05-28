@@ -128,9 +128,9 @@ func TestGetStaticcheckAnalyzers(t *testing.T) {
 
 func TestToolNameForAnalyzer_EdgeCases(t *testing.T) {
 	tests := []struct {
-		name string
+		name  string
 		aName string
-		want string
+		want  string
 	}{
 		{"empty name", "", "govet"},
 		{"very long name", "thisisaverylonganalyzernameindeedtoolong", "govet"},
@@ -304,14 +304,14 @@ func TestResolvePos(t *testing.T) {
 
 		pkg := &packages.Package{Fset: fset}
 		pos := f.Pos(0)
-	file, line, col := resolvePos(pos, pkg)
-	if file != "main.go" {
-		t.Errorf("file = %q, want main.go", file)
-	}
-	if line != 1 {
-		t.Errorf("line = %d, want 1", line)
-	}
-	_ = col
+		file, line, col := resolvePos(pos, pkg)
+		if file != "main.go" {
+			t.Errorf("file = %q, want main.go", file)
+		}
+		if line != 1 {
+			t.Errorf("line = %d, want 1", line)
+		}
+		_ = col
 	})
 }
 

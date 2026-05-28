@@ -90,5 +90,3 @@ func (s *Scanner) HasFindings(content []byte) bool {
 	filtered := filterByGitleaksAllow(findings, content)
 	return len(filtered) > 0
 }
-
-

@@ -74,9 +74,9 @@ func TestConvertFindings(t *testing.T) {
 		if f.Severity != "warning" {
 			t.Errorf("Severity = %q, want %q", f.Severity, "warning")
 		}
-			if f.Secret != "sk_l...p7dc" {
-				t.Errorf("Secret = %q, want %q", f.Secret, "sk_l...p7dc")
-			}
+		if f.Secret != "sk_l...p7dc" {
+			t.Errorf("Secret = %q, want %q", f.Secret, "sk_l...p7dc")
+		}
 	})
 
 	t.Run("short secret", func(t *testing.T) {

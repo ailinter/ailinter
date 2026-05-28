@@ -28,7 +28,7 @@
 
 ### What `@ailinter` does:
 
-1. Runs `ailinter check <paths> --format problems --no-secrets` — code quality + vulnerabilities
+1. Runs `ailinter check <paths> --format problems --no-secrets` — code quality + vulnerabilities + **go vet/staticcheck/gofmt/misspell/ineffassign by default**
 2. Runs `ailinter check <paths> --format problems --secrets-only` — secrets only
 3. Parses line-oriented results: code quality scores, vulnerability findings, secret detections
 4. Returns a concise structured summary (≤ 30 lines)
@@ -66,7 +66,24 @@ When refactoring or improving code:
    - Confirm measurable improvement (higher score, fewer issues)
    - No regression in ANY area
 
-### 3. Catch Secrets Before Commit
+### 3. Catch Go Vet Issues Before Commit (NEW)
+
+**Mandatory for Go test files.** Before suggesting a commit:
+
+1. Run `go vet ./<package>/...` on any modified Go package — catch `sync.Once` copy violations, `loopclosure`, nilness, etc.
+2. All AI-generated test files MUST pass `go vet` before commit
+3. `ailinter check --meta-lint` now runs `go vet` + `staticcheck` + `gofmt` + `misspell` + `ineffassign` **by default** — no need to pass `--meta-lint` explicitly
+
+Example of what `go vet` catches (DO NOT write this pattern):
+```go
+// WRONG — copies sync.Once (which contains sync.noCopy):
+origOnce := initOnce  // "assignment copies lock value"
+
+// RIGHT — just reset with direct assignment:
+initOnce = sync.Once{}
+```
+
+### 4. Catch Secrets Before Commit
 
 Before suggesting a commit:
 - Run `scan_for_secrets` on all modified files
