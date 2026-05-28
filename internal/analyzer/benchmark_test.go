@@ -29,7 +29,7 @@ func DeepNested(data *Data) error {
 `
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		analyzer.Analyze("test.go", src, "go", analyzer.DefaultThresholds("go"))
+		analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
 	}
 }
 
@@ -56,7 +56,7 @@ func Func%d() {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		analyzer.Analyze("test.go", src, "go", analyzer.DefaultThresholds("go"))
+		analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
 	}
 }
 
@@ -85,7 +85,7 @@ func TestBenchmarkCSComparison(t *testing.T) {
 			if err != nil {
 				t.Skipf("testdata not available: %v", err)
 			}
-			result := analyzer.Analyze(tt.file, string(data), "go", analyzer.DefaultThresholds("go"))
+			result := analyzer.Analyze(analyzer.SourceInput{FilePath: tt.file, Source: string(data), Lang: "go"}, analyzer.DefaultThresholds("go"))
 			if result.Score < tt.minScore || result.Score > tt.maxScore {
 				t.Errorf("score %d not in [%d, %d]", result.Score, tt.minScore, tt.maxScore)
 			}
@@ -143,7 +143,7 @@ func TestAllFixtureFiles(t *testing.T) {
 				t.Skipf("file not found: %v", err)
 			}
 			lang := detectLang(file)
-			result := analyzer.Analyze(file, string(data), lang, analyzer.DefaultThresholds(lang))
+			result := analyzer.Analyze(analyzer.SourceInput{FilePath: file, Source: string(data), Lang: lang}, analyzer.DefaultThresholds(lang))
 
 			if result.Score < 1.0 || result.Score > 100 {
 				t.Errorf("score %d out of range [1.0, 100]", result.Score)

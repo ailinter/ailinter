@@ -1,7 +1,6 @@
 package secrets
 
 import (
-	"bytes"
 	_ "embed"
 	"fmt"
 	"strings"
@@ -9,7 +8,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/zricethezav/gitleaks/v8/config"
 	"github.com/zricethezav/gitleaks/v8/detect"
-	"github.com/zricethezav/gitleaks/v8/report"
 )
 
 //go:embed betterleaks.toml
@@ -93,103 +91,4 @@ func (s *Scanner) HasFindings(content []byte) bool {
 	return len(filtered) > 0
 }
 
-func convertFindings(findings []report.Finding, filePath string) []SecretFinding {
-	result := make([]SecretFinding, 0, len(findings))
-	for _, f := range findings {
-		if isFalsePositive(f) {
-			continue
-		}
-		sev := classifySeverity(f)
-		result = append(result, SecretFinding{
-			RuleID:      f.RuleID,
-			Description: f.Description,
-			Line:        f.StartLine,
-			Column:      f.StartColumn,
-			Secret:      redactSecret(f.Secret),
-			Entropy:     float64(f.Entropy),
-			Severity:    sev,
-			Message:     generateAIPrompt(f),
-		})
-	}
-	return result
-}
 
-func classifySeverity(f report.Finding) string {
-	if f.Entropy >= 4.5 {
-		return "critical"
-	}
-	if f.Entropy >= 3.5 {
-		return "alert"
-	}
-	return "warning"
-}
-
-func redactSecret(secret string) string {
-	if len(secret) <= 8 {
-		return "***"
-	}
-	return secret[:4] + "..." + secret[len(secret)-4:]
-}
-
-func generateAIPrompt(f report.Finding) string {
-	return fmt.Sprintf(
-		"CRITICAL: %s detected on line %d. %s. "+
-			"You MUST rewrite this to use environment variables (e.g., os.Getenv(\"VAR_NAME\")). "+
-			"Never hardcode secrets in source code.",
-		f.RuleID, f.StartLine, f.Description,
-	)
-}
-
-func filterByGitleaksAllow(findings []report.Finding, content []byte) []report.Finding {
-	if len(findings) == 0 {
-		return findings
-	}
-	var filtered []report.Finding
-	for _, f := range findings {
-		if hasGitleaksAllow(content, f.StartLine) {
-			continue
-		}
-		filtered = append(filtered, f)
-	}
-	return filtered
-}
-
-func hasGitleaksAllow(content []byte, findingLine int) bool {
-	lines := bytes.Split(content, []byte("\n"))
-	for _, lineIdx := range []int{findingLine - 1, findingLine - 2, findingLine} {
-		if lineIdx < 0 || lineIdx >= len(lines) {
-			continue
-		}
-		trimmed := bytes.TrimSpace(lines[lineIdx])
-		if bytes.Contains(trimmed, []byte("gitleaks:allow")) {
-			return true
-		}
-	}
-	return false
-}
-
-func isFalsePositive(f report.Finding) bool {
-	secret := strings.ToLower(f.Secret)
-	switch {
-	case secret == "your-api-key-here" || secret == "your-token-here" || secret == "your-secret-here":
-		return true
-	case secret == "default_value":
-		return true
-	case secret == "placeholder" || secret == "example":
-		return true
-	case secret == "super_secret_jwt_value":
-		return true
-	case secret == "hardcoded_password_123":
-		return true
-	case isJWTHeaderOnly(f.Secret):
-		return true
-	}
-	return false
-}
-
-func isJWTHeaderOnly(secret string) bool {
-	if !strings.HasPrefix(secret, "eyJ") || strings.Contains(secret, ".") {
-		return false
-	}
-	return len(secret) <= 50
-}

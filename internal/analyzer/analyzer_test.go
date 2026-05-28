@@ -16,7 +16,7 @@ func Greet(name string) string {
 	return "Hello, " + name + "!"
 }
 `
-	result := analyzer.Analyze("test.go", src, "go", analyzer.DefaultThresholds("go"))
+		result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
 	if result.Score < 95 {
 		t.Errorf("healthy file should score >= 95, got %d", result.Score)
 	}
@@ -43,7 +43,7 @@ func DeepNested(data *Data) error {
 	return nil
 }
 `
-	result := analyzer.Analyze("test.go", src, "go", analyzer.DefaultThresholds("go"))
+		result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
 	t.Logf("Score: %d, Smells: %d", result.Score, len(result.Smells))
 	for _, s := range result.Smells {
 		t.Logf("  [%s] %s", s.Severity, s.Name)
@@ -68,7 +68,7 @@ func TestBrainMethod_Detected(t *testing.T) {
 	}
 	src += "}\n"
 
-	result := analyzer.Analyze("test.go", src, "go", analyzer.DefaultThresholds("go"))
+		result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
 	found := false
 	for _, s := range result.Smells {
 		if s.Name == "brain_method" {
@@ -86,7 +86,7 @@ func TestFileBloat_Detected(t *testing.T) {
 	for i := 0; i < 1100; i++ {
 		src += "var x" + string(rune('a'+i%26)) + " = 1\n"
 	}
-	result := analyzer.Analyze("test.go", src, "go", analyzer.DefaultThresholds("go"))
+		result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
 	found := false
 	for _, s := range result.Smells {
 		if s.Name == "file_bloat" {
@@ -109,7 +109,7 @@ func IsEligible(user *User) bool {
 	return false
 }
 `
-	result := analyzer.Analyze("test.go", src, "go", analyzer.DefaultThresholds("go"))
+		result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
 	found := false
 	for _, s := range result.Smells {
 		if s.Name == "complex_conditional" {
@@ -149,7 +149,7 @@ func TwoBumps(items []int) int {
 	return c
 }
 `
-	result := analyzer.Analyze("test.go", src, "go", analyzer.DefaultThresholds("go"))
+		result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
 	t.Logf("Score: %d, Smells: %d", result.Score, len(result.Smells))
 	for _, s := range result.Smells {
 		t.Logf("  [%s] %s: %s", s.Severity, s.Name, s.Message)
@@ -200,7 +200,7 @@ func ProcessB(data []int) int {
 	return s
 }
 `
-	result := analyzer.Analyze("test.go", src, "go", analyzer.DefaultThresholds("go"))
+		result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
 	for _, s := range result.Smells {
 		t.Logf("  [%s] %s: %s", s.Severity, s.Name, s.Message)
 	}
@@ -236,7 +236,7 @@ func ComplexFunc(x int) string {
 	return "zero"
 }
 `
-	result := analyzer.Analyze("test.go", src, "go", analyzer.DefaultThresholds("go"))
+		result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
 	t.Logf("Score: %d, Smells: %d", result.Score, len(result.Smells))
 	found := false
 	for _, s := range result.Smells {

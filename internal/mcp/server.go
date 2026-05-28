@@ -133,7 +133,7 @@ func handleAnalyzeCode(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 	}
 
 	thresholds := config.LoadProjectThresholds(resolvedPath, lang)
-	result := analyzer.Analyze(resolvedPath, string(data), lang, thresholds)
+	result := analyzer.Analyze(analyzer.SourceInput{FilePath: resolvedPath, Source: string(data), Lang: lang}, thresholds)
 
 	telemetry.RecordFileAnalyzed(lang, ext)
 	telemetry.RecordQualityScore(lang, result.Score)
@@ -250,7 +250,7 @@ func handleAssessFile(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallTo
 	}
 
 	thresholds := config.LoadProjectThresholds(resolvedPath, lang)
-	result := analyzer.Analyze(resolvedPath, string(data), lang, thresholds)
+	result := analyzer.Analyze(analyzer.SourceInput{FilePath: resolvedPath, Source: string(data), Lang: lang}, thresholds)
 
 	telemetry.RecordFileAnalyzed(lang, ext)
 	telemetry.RecordQualityScore(lang, result.Score)

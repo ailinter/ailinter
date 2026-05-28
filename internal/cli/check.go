@@ -24,6 +24,7 @@ type checkOptions struct {
 	secretsOnly         bool
 	vulnerabilitiesOnly bool
 	langOverride        string
+	estimateTokens      bool
 }
 
 func CheckCommand() *cobra.Command {
@@ -158,7 +159,7 @@ func checkFile(path string, opts checkOptions) error {
 	lang := opts.detectLang(resolved)
 	ext := filepath.Ext(resolved)
 	thresholds := config.LoadProjectThresholds(resolved, lang)
-	result := analyzer.Analyze(resolved, string(data), lang, thresholds)
+	result := analyzer.Analyze(analyzer.SourceInput{FilePath: resolved, Source: string(data), Lang: lang}, thresholds)
 
 	telemetry.RecordFileAnalyzed(lang, ext)
 	telemetry.RecordQualityScore(lang, result.Score)
@@ -261,7 +262,7 @@ func (ctx *walkContext) walkFn(path string, d os.DirEntry, err error) error {
 	if ctx.scanQuality {
 		lang := ctx.opts.detectLang(path)
 		thresholds := config.LoadProjectThresholds(path, lang)
-		result := analyzer.Analyze(path, string(data), lang, thresholds)
+		result := analyzer.Analyze(analyzer.SourceInput{FilePath: path, Source: string(data), Lang: lang}, thresholds)
 		ctx.allResults = append(ctx.allResults, result)
 	}
 
