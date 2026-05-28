@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "v0.8.5"
+var version = "v0.8.6"
 
 func init() {
 	if info, ok := debug.ReadBuildInfo(); ok {

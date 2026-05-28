@@ -1,5 +1,26 @@
 # Changelog
 
+## [v0.8.6] — 2026-05-28
+
+### Added
+- **Telemetry improvements**: flag tracking, MCP client detection, first-run detection, directory scan metrics, Go version in resource attributes
+- **Pre-commit hook**: `scripts/pre-commit.sh` with 3-step quality gate (go vet → go fmt → ailinter self-check)
+- **Makefile targets**: `precommit` target aliased to `lint check`
+
+### Changed
+- **Metalinter**: `Tests: true` now includes test files (was excluding them); `--meta-lint` enabled by default
+- **Version**: `v0.8.5` → `v0.8.6`
+
+### Gaps (In Progress — deferred to v0.9)
+- **Benchmark report**: README badge + comparison table (203% recall vs gitleaks) — see `benchmark-report.md`
+- **CLI coverage**: `internal/cli` at 74.8% → target 80% — see `cli-coverage-80.md`
+- **Demo GIFs**: 5 terminal recordings for landing page/README — see `demo-content.md`
+
+### Fixed
+- **Metalinter bug**: `Tests: true` flag now correctly includes test files in analysis
+- **sync.Once copy violation**: removed `sync.Once` copy in telemetry tests (`telemetry_init_test.go`)
+- **Gofmt compliance**: formatting fixed across 5 files
+
 ## [v0.8.5] — 2026-05-28
 
 ### Added
