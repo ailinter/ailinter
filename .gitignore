@@ -50,10 +50,11 @@ ailinter-spec.md
 research/
 SecretBench/
 
-# Benchmark repos and data
-benchmarks/repos/
-benchmarks/data/
-benchmarks/report.html
+# Satellite repos (separate git, not tracked by core repo)
+ops/
+benchmarks/
+telemetry-worker/
+.ailinter-meta/
 
 # Local dev tool configs
 opencode.json
