@@ -60,3 +60,6 @@ telemetry-worker/
 opencode.json
 .opencode/
 .playwright-mcp/
+
+# Wrangler cache
+.wrangler/
