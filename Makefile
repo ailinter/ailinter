@@ -13,6 +13,11 @@ run: build
 test:
 	go test ./... -v -count=1
 
+# Quick smoke test — runs only fast unit tests, skips integration/benchmarks.
+# Use this during development. CI should use 'make test' for full coverage.
+test-quick:
+	go test ./... -short -count=1
+
 # Run ailinter check with meta-linters before building/testing
 check:
 	./bin/ailinter check ./... --format problems

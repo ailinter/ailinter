@@ -12,6 +12,9 @@ import (
 
 func startClient(t *testing.T) (*client.Client, func()) {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 
 	c, err := client.NewStdioMCPClient("../../bin/ailinter", nil, "mcp")
 	if err != nil {

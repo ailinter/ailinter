@@ -15,7 +15,7 @@
 [![MCP](https://img.shields.io/badge/MCP-Compatible-6e41e2)](https://modelcontextprotocol.io)
 [![Tests](https://img.shields.io/badge/tests-passing-22C55E)](https://github.com/ailinter/ailinter/actions)
 [![Coverage](https://img.shields.io/badge/coverage-85%25-22C55E)]()
-[![Binary](https://img.shields.io/badge/binary-15MB-lightgrey)](https://github.com/ailinter/ailinter/releases)
+[![Binary](https://img.shields.io/badge/binary-30MB-lightgrey)](https://github.com/ailinter/ailinter/releases)
 [![Benchmark](https://img.shields.io/badge/secret_detection-100%25_recall_⋅_0_FP-22C55E)](https://github.com/ailinter/ailinter/blob/main/README.md#benchmarks)
 
 <p align="center">
@@ -126,7 +126,7 @@ Every file also gets a vulnerability classification:
 | Refactoring Guide | **16 patterns** | — | — |
 | MCP Tools | **7** | — | — |
 | Git Hotspots | ✓ | — | — |
-| Binary Size | **15 MB** | ~400 MB Docker | ~10 MB |
+| Binary Size | **30 MB** | ~400 MB Docker | ~10 MB |
 | Dependencies | **Zero** | Docker + JVM | Zero |
 | License | **MIT** | LGPL+Proprietary | MIT |
 
@@ -289,7 +289,7 @@ Comprehensive 7-tool comparison across **11 controlled test fixtures** (24 known
 
 | Tool | Recall | Precision | F1 | FP (106 clean files) | Speed | Binary |
 |------|:---:|:---:|:---:|:---:|------:|:---:|
-| **ailinter** | **100%** (24/24) | **100%** | **1.00** | **0** | **347ms** | 15 MB |
+| **ailinter** | **100%** (24/24) | **100%** | **1.00** | **0** | **347ms** | **30 MB** |
 | gitleaks | 100% (24/24) | 100% | 1.00 | 0 | 357ms | 10 MB |
 | betterleaks | 100% (24/24) | 100% | 1.00 | 0 | 2,119ms | 40 MB |
 | trufflehog | 92% (22/24) | 100% | 0.96 | 0 | 15,737ms | 85 MB |
@@ -302,7 +302,7 @@ Comprehensive 7-tool comparison across **11 controlled test fixtures** (24 known
 - **Zero false positives** across 106 clean files — one of only 3 tools (ailinter, gitleaks, betterleaks) to achieve this
 - **203+ combined patterns** — 150 secret detection rules + 58 vulnerability patterns = 203% more coverage than gitleaks alone
 - **Fastest unified scan** — ailinter completes in 347ms while also running code quality analysis and vulnerability detection in the same pass
-- **Only unified tool** — combines code quality (20 detectors), secret scanning (150+ rules), vulnerability analysis (58 patterns), AI refactoring guidance (16 patterns), and MCP server (7 tools) in a single 15 MB MIT-licensed binary
+- **Only unified tool** — combines code quality (20 detectors), secret scanning (150+ rules), vulnerability analysis (58 patterns), AI refactoring guidance (16 patterns), and MCP server (7 tools) in a single lightweight MIT-licensed binary
 
 > **Methodology:** Apple Silicon (arm64), Go 1.26, gitleaks v8.30.1, betterleaks dev (main), trufflehog v3.95.3, detect-secrets v1.5.0, semgrep v1.157.0. Speed is wall-clock time including process startup. See [Full Benchmark Report](https://github.com/ailinter/benchmarks).
 
@@ -326,7 +326,7 @@ internal/
 
 **Stack:** Go · [mcp-go](https://github.com/mark3labs/mcp-go) · [betterleaks](https://github.com/betterleaks/betterleaks) · [gitleaks](https://github.com/gitleaks/gitleaks) · [cobra](https://github.com/spf13/cobra) · MIT
 
-**Build:** `make build` → 15 MB binary, zero runtime dependencies. Targets: darwin, linux, windows (amd64 + arm64).
+**Build:** `make build` → 30 MB binary, zero runtime dependencies. Targets: darwin, linux, windows (amd64 + arm64).
 
 ---
 

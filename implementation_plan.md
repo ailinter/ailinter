@@ -2,7 +2,7 @@
 
 ## Project Understanding
 
-**ailinter** is an open-source AI linter and safety visor for AI-assisted development. It's a Go binary (~15MB) that provides:
+**ailinter** is an open-source AI linter and safety visor for AI-assisted development. It's a Go binary (was ~15MB, now ~29MB stripped — final size TBD from @devops-engineer) that provides:
 
 1. **Code Quality Radar** — 17 structural detectors producing a 0-100 quality score
 2. **Secret Scanning** — 269 detection rules (betterleaks engine, evolved gitleaks)
@@ -25,7 +25,7 @@
 > **GitHub Organization**: You mention `ailinter` org on GitHub. Is `github.com/ailinter` already created? The go.mod already uses `github.com/ailinter/ailinter` as the module path — this needs to match the actual GitHub org/repo.
 
 > [!WARNING]
-> **Compiled binaries in repo**: There are 3 compiled binaries in the repo root (`ailinter` 14MB, `main` 3MB, `comprehensive_main` 3.3MB) plus `bin/ailinter` (15MB). These should NOT be committed. The `.gitignore` already excludes `bin/` and root `ailinter`, but `main` and `comprehensive_main` are not excluded.
+> **Compiled binaries in repo**: There are 3 compiled binaries in the repo root (`ailinter` 14MB, `main` 3MB, `comprehensive_main` 3.3MB) plus `bin/ailinter` (was 15MB, now ~29MB stripped). These should NOT be committed. The `.gitignore` already excludes `bin/` and root `ailinter`, but `main` and `comprehensive_main` are not excluded.
 
 > [!WARNING]
 > **Generated report files in root**: `report.md` (12KB), `coverage-core.out` (82KB), `coverage.out` (94KB), `coverage.html` (191KB), `test-report.html` (99KB), `test-report.json` (258KB) are all in the root. Most are in `.gitignore` but `coverage-core.out` is not.
