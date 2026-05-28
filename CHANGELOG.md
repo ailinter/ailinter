@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.8.5] — 2026-05-28
+
+### Added
+- **Metalinter package**: Multi-linter integration with go vet, staticcheck, misspell, ineffassign
+- **Token estimator**: Estimate token cost of code analysis for LLM context window management
+- **Function coverage gate**: 70% function coverage + 80% line coverage enforcement in CI
+
+### Changed
+- Improved quality scores — analyzer 99, scanner 100 across core packages
+- Updated dependencies: viper v1.21, go-toml v3.1, isatty v0.0.22, mergo v1.0.2
+- go.mod: go 1.25.5 directive
+- Version from `0.0.0-dev` → `v0.8.5`
+
+### Fixed
+- Telemetry test: fixed TestInit_ResourceError to correctly test disabled path
+- CI coverage exclusion: exclude scripts/ and cmd/ from test coverage
+- Release workflow: proper contents:write permission, single aggregated release
+
 ## [v0.8.1] — 2026-05-28
 
 ### Added

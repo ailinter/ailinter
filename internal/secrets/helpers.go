@@ -92,6 +92,12 @@ func hasGitleaksAllow(content []byte, findingLine int) bool {
 }
 
 // -- False positive detection --
+//
+// isFalsePositive catches strings that gitleaks may flag via entropy heuristics
+// but are clearly not secrets. This supplements gitleaks' built-in allowlist/filter:
+//   - Known placeholder/example values (hardcoded switch cases)
+//   - Prefix-based allowlist for common non-secret patterns (e.g., test data)
+//   - JWT header fragments without payload/signature
 
 func isFalsePositive(f report.Finding) bool {
 	secret := strings.ToLower(f.Secret)
@@ -99,6 +105,9 @@ func isFalsePositive(f report.Finding) bool {
 	case "your-api-key-here", "your-token-here", "your-secret-here",
 		"default_value", "placeholder", "example",
 		"super_secret_jwt_value", "hardcoded_password_123":
+		return true
+	}
+	if strings.HasPrefix(secret, "this_is_just_a_") {
 		return true
 	}
 	if isJWTHeaderOnly(f.Secret) {

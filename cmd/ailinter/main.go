@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version = "0.0.0-dev"
+var version = "v0.8.5"
 
 func init() {
 	if info, ok := debug.ReadBuildInfo(); ok {
@@ -72,7 +72,7 @@ func listRulesCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List active rules for a language",
-		RunE: runListRulesE,
+		RunE:  runListRulesE,
 	}
 	cmd.Flags().String("lang", "", "Filter rules for a specific language (go, python, javascript, typescript, java, csharp, ruby, swift, kotlin, rust, cpp, c)")
 	return cmd
@@ -153,18 +153,18 @@ func printTelemetryInfo() {
 }
 
 type langRules struct {
-	NestingWarn   string
-	FuncLOCWarn   string
-	FileLOCWarn   string
-	MaxArgs       string
+	NestingWarn string
+	FuncLOCWarn string
+	FileLOCWarn string
+	MaxArgs     string
 }
 
 var languageRules = map[string]langRules{
-	"go":                {"4", "80", "1000", "4"},
-	"python":            {"4", "70", "600", "4"},
-	"javascript":        {"3", "60", "700", "4"},
-	"typescript":        {"3", "60", "700", "4"},
-	"java":             {"4", "70", "600", "5"},
+	"go":         {"4", "80", "1000", "4"},
+	"python":     {"4", "70", "600", "4"},
+	"javascript": {"3", "60", "700", "4"},
+	"typescript": {"3", "60", "700", "4"},
+	"java":       {"4", "70", "600", "5"},
 }
 
 func printLanguageRules(lang string) {

@@ -16,7 +16,7 @@ type TokenEstimator struct {
 
 // ModelPricing holds pricing info for an AI model.
 type ModelPricing struct {
-	Name  string
+	Name           string
 	CostPerMTokens float64 // USD per million input tokens
 }
 

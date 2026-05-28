@@ -20,9 +20,12 @@ func TestIsFalsePositive(t *testing.T) {
 		{"example", true},
 		{"super_secret_jwt_value", true},
 		{"hardcoded_password_123", true},
+		{"this_is_just_a_normal_string_with_no_secret_pattern", true},
+		{"this_is_just_a_test_prefix_should_be_filtered", true},
 		{"sk_live_4eC39HqLyjWDarjtT1zdp7dc", false},
 		{"AKIAIOSFODNN7EXAMPLE", false},
 		{"real-secret-value-123", false},
+		{"not_this_is_just_a_prefix_but_different", false},
 	}
 	for _, tc := range tests {
 		f := report.Finding{Secret: tc.secret}

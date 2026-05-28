@@ -228,6 +228,12 @@ Every finding includes a human-readable description, line/column location, sever
 
 Secrets are **redacted** in MCP output — AI assistants never see the full secret value.
 
+### Known Limitation: Concatenated Secrets
+
+Secret scanning operates on a per-line/per-value basis using regex patterns. Secrets that are **split across multiple variables and concatenated at runtime** (e.g., `pk1 = "sk_live_"` + `pk2 = "ABC123"`) are **not detected**. This is an inherent limitation of static regex-based scanning (shared by gitleaks, trufflehog, and all similar tools).
+
+To mitigate: prefer reading credentials from environment variables or secret management systems rather than splitting secret values across variables.
+
 ---
 
 ## CLI

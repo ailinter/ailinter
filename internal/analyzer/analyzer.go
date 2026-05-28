@@ -163,25 +163,23 @@ func detectCodeLevelSmells(lines []string, bloats []FunctionBloat, t Thresholds)
 	return smells
 }
 
-
-
 type langDetector func(lines []string) []FunctionBloat
 
 var functionDetectors = map[string]langDetector{
-	"python":       funcDetectIndent,
-	"javascript":   parser.DetectFunctionBloatsTS,
-	"typescript":   parser.DetectFunctionBloatsTS,
-	"cpp":          parser.DetectFunctionBloatsCPP,
-	"c":            parser.DetectFunctionBloatsCPP,
-	"c++":          parser.DetectFunctionBloatsCPP,
-	"cc":           parser.DetectFunctionBloatsCPP,
-	"java":         parser.DetectFunctionBloatsJava,
-	"csharp":       parser.DetectFunctionBloatsJava,
-	"cs":           parser.DetectFunctionBloatsJava,
-	"rust":         parser.DetectFunctionBloatsRust,
-	"ruby":         parser.DetectFunctionBloatsRuby,
-	"swift":        parser.DetectFunctionBloatsSwift,
-	"kotlin":       parser.DetectFunctionBloatsKotlin,
+	"python":     funcDetectIndent,
+	"javascript": parser.DetectFunctionBloatsTS,
+	"typescript": parser.DetectFunctionBloatsTS,
+	"cpp":        parser.DetectFunctionBloatsCPP,
+	"c":          parser.DetectFunctionBloatsCPP,
+	"c++":        parser.DetectFunctionBloatsCPP,
+	"cc":         parser.DetectFunctionBloatsCPP,
+	"java":       parser.DetectFunctionBloatsJava,
+	"csharp":     parser.DetectFunctionBloatsJava,
+	"cs":         parser.DetectFunctionBloatsJava,
+	"rust":       parser.DetectFunctionBloatsRust,
+	"ruby":       parser.DetectFunctionBloatsRuby,
+	"swift":      parser.DetectFunctionBloatsSwift,
+	"kotlin":     parser.DetectFunctionBloatsKotlin,
 }
 
 func funcDetectIndent(lines []string) []FunctionBloat {

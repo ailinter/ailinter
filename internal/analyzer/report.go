@@ -398,6 +398,46 @@ func isSourceFileReport(path string) bool {
 	return false
 }
 
+// TestComputeOverallScoreHelper is exported for testing.
+func TestComputeOverallScoreHelper(results []QualityResult) int {
+	return computeOverallScore(results)
+}
+
+// TestScoreEmojiHelper is exported for testing.
+func TestScoreEmojiHelper(score int) string {
+	return scoreEmoji(score)
+}
+
+// TestDetectorStatusHelper is exported for testing.
+func TestDetectorStatusHelper(detector string, results []QualityResult) string {
+	return detectorStatus(detector, results)
+}
+
+// TestCountAllSmellsHelper is exported for testing.
+func TestCountAllSmellsHelper(results []QualityResult) int {
+	return countAllSmells(results)
+}
+
+// TestIsSourceFileReportHelper is exported for testing.
+func TestIsSourceFileReportHelper(path string) bool {
+	return isSourceFileReport(path)
+}
+
+// TestIsBinaryFileHelper is exported for testing.
+func TestIsBinaryFileHelper(data []byte) bool {
+	return isBinaryFile(data)
+}
+
+// TestLoadGitignoreSimpleHelper is exported for testing.
+func TestLoadGitignoreSimpleHelper(root string) []string {
+	return loadGitignoreSimple(root)
+}
+
+// TestIsGitignoredReportHelper is exported for testing.
+func TestIsGitignoredReportHelper(path, root string, patterns []string) bool {
+	return isGitignoredReport(path, root, patterns)
+}
+
 func isBinaryFile(data []byte) bool {
 	if len(data) == 0 {
 		return false
