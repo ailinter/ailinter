@@ -55,8 +55,8 @@ jobs:
         with:
           name: ailinter-${{ matrix.os }}-${{ matrix.arch }}
           path: |
-            ailinter_*_${{ matrix.os }}_${{ matrix.arch }}
-            ailinter_*_${{ matrix.os }}_${{ matrix.arch }}.sha256
+            ailinter_*_${{ matrix.os }}_${{ matrix.arch }}*
+            ailinter_*_${{ matrix.os }}_${{ matrix.arch }}*.sha256
 
   release:
     name: Create Release
