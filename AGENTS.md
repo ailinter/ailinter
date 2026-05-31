@@ -83,12 +83,104 @@ origOnce := initOnce  // "assignment copies lock value"
 initOnce = sync.Once{}
 ```
 
-### 4. Catch Secrets Before Commit
+### 4. Catch Staticcheck Issues Before Commit (NEW)
+
+**Mandatory before every commit.** `go vet` and `go test` do NOT catch unused functions.
+
+1. Run `staticcheck ./...` on the entire repo — catches unused code (U1000), deprecated APIs (SA1019), and subtle bugs
+2. Install: `go install honnef.co/go/tools/cmd/staticcheck@latest`
+3. The pre-commit hook (`scripts/pre-commit.sh`) now runs staticcheck on changed packages automatically
+4. All AI-generated code MUST pass staticcheck before commit
+
+### 5. Catch Secrets Before Commit
 
 Before suggesting a commit:
 - Run `scan_for_secrets` on all modified files
 - If secrets detected: rewrite to use environment variables or secret management
 - Never commit hardcoded credentials, API keys, or tokens
+
+## Template & Generated Code Safety
+
+### HTML Template JS Escaping
+
+Go's `html/template` package auto-escapes ALL content, including JSON intended for JavaScript
+blocks. This silently breaks generated HTML.
+
+```go
+// WRONG — html/template escapes the JSON, turning [ into &amp;#91;
+type data struct {
+    ElementsJSON string  // {{.ElementsJSON}} → escaped string, not JS
+}
+
+// RIGHT — use template.JS to mark content as safe JavaScript
+type data struct {
+    ElementsJSON template.JS  // {{.ElementsJSON}} → raw JS, unescaped
+}
+data := data{ElementsJSON: template.JS(jsonBytes)}
+```
+
+**Always test generated HTML** by opening it in a browser before pushing. A test that
+checks `strings.Contains(html, "const DATA")` is NOT sufficient — it must verify the
+content is valid JavaScript, not an escaped string.
+
+### CDN Library Versioning
+
+Always pin exact versions for CDN-loaded libraries. Unpinned imports (e.g.,
+`cytoscape-fcose/cytoscape-fcose.js` without a version tag) break silently
+when the upstream API changes.
+
+```html
+<!-- WRONG — latest version may be incompatible -->
+<script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
+
+<!-- RIGHT — pinned to a tested version -->
+<script src="https://unpkg.com/cytoscape@3.30/dist/cytoscape.min.js"></script>
+```
+
+Prefer built-in functionality over plugins. Cytoscape's built-in `cose` layout avoids
+the external `fcose` plugin entirely.
+
+### Persistence Path Safety
+
+Never hardcode `~/.ailinter/` or `os.UserHomeDir()` for persistence paths.
+Use workspace-relative or configurable paths:
+
+```go
+// WRONG — not portable, pollutes home directory
+func snapshotPath() string {
+    home, _ := os.UserHomeDir()
+    return filepath.Join(home, ".ailinter", "knowledge", "snapshot.json")
+}
+
+// RIGHT — workspace-relative, portable
+func (g *Graph) snapshotPath() string {
+    return filepath.Join(g.KnowledgeDir, "snapshot.json")
+}
+```
+
+### Logic Bugs in Persistence
+
+When writing `NeedsRebuild()` or similar freshness checks, verify the return value carefully:
+
+```go
+// WRONG — always returns true after the loop
+for ... {
+    if stale { return true }
+}
+return true  // ← BUG
+
+// RIGHT — return false if nothing is stale
+return false
+```
+
+Also truncate timestamps to second precision — many filesystems don't preserve
+nanosecond mtimes, causing false-positive staleness:
+
+```go
+if info.ModTime().Truncate(time.Second).After(mtime.Truncate(time.Second)) {
+    return true
+}
+```
 
 ---
 
