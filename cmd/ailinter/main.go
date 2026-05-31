@@ -33,6 +33,7 @@ func main() {
 	root.AddCommand(cli.ReportCommand())
 	root.AddCommand(cli.MCPCommand(version))
 	root.AddCommand(cli.InitCommand())
+	root.AddCommand(cli.KnowledgeCommand())
 	root.AddCommand(rulesCommand())
 	root.AddCommand(telemetryCommand())
 

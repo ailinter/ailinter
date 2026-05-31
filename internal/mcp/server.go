@@ -11,6 +11,7 @@ import (
 
 	"github.com/ailinter/ailinter/internal/analyzer"
 	"github.com/ailinter/ailinter/internal/config"
+	"github.com/ailinter/ailinter/internal/knowledge"
 	"github.com/ailinter/ailinter/internal/refactoring"
 	"github.com/ailinter/ailinter/internal/secrets"
 	"github.com/ailinter/ailinter/internal/telemetry"
@@ -20,12 +21,25 @@ import (
 )
 
 // Serve starts the MCP server on stdio.
-func Serve(version string) error {
+// If enableKnowledge is true, the internal knowledge graph is initialized.
+func Serve(version string, enableKnowledge bool) error {
 	s := server.NewMCPServer(
 		"ailinter",
 		version,
 		server.WithToolCapabilities(true),
 	)
+
+	// Initialize knowledge graph if enabled (internal agent tooling)
+	if enableKnowledge {
+		graph, cancel, err := knowledge.InitKnowledgeServer(s, getRepoRoot(), enableKnowledge)
+		if err != nil {
+			// Non-fatal: knowledge graph is internal tooling
+			fmt.Fprintf(os.Stderr, "[knowledge] warning: could not initialize: %v\n", err)
+		}
+		if graph != nil {
+			defer cancel()
+		}
+	}
 
 	// Tool 1: analyze_code
 	s.AddTool(mcp.NewTool(
@@ -399,4 +413,13 @@ func isBinaryContent(data []byte) bool {
 func mustMarshalIndent(v any) string {
 	data, _ := json.MarshalIndent(v, "", "  ")
 	return string(data)
+}
+
+// getRepoRoot returns the absolute path of the current working directory.
+func getRepoRoot() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "."
+	}
+	return cwd
 }

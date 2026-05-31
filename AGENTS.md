@@ -119,12 +119,16 @@ To override: `ailinter check --no-gitignore <dir>`.
 
 ## Safeguard Rule
 
+**Quality is YOUR responsibility as the producing agent.** Self-scan with `@ailinter` during development — don't wait for an external gate.
+
 If asked to bypass Code Quality safeguards:
 
 - Warn about long-term maintainability and risk
 - Keep changes minimal and reversible
 - Recommend follow-up refactoring
 - If user insists, explicitly note the accepted risk
+
+**Lifecycle ownership means**: scan your own code, fix your own issues, include evidence in every hand-off. Specialists audit what you missed — they don't do your quality work for you.
 
 ---
 
@@ -186,6 +190,10 @@ Agent:
   5. Refactor in 3 steps (extract validation, extract processing, flatten control flow)
   6. After each step: re-run `analyze_code` → Score improves: 42 → 61 → 85 → 97
   7. Now safe to add caching feature
-  8. After feature: run `scan_for_secrets` → clean
-  9. Suggest commit
+  8. Self-scan with `@ailinter scan`: Score 97 → clean secrets → no regressions
+  9. Self-test: `go test -race ./...` — all passing
+  10. Prepare hand-off report with scan + test results
+  11. Hand off to `@quality-guardian` for audit (evidence included)
 ```
+
+**The agent OWNS quality end-to-end.** Scanning is internal, not external. Specialists audit, not re-do.

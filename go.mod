@@ -4,6 +4,7 @@ go 1.25.5
 
 require (
 	github.com/client9/misspell v0.3.4
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gordonklaus/ineffassign v0.2.0
 	github.com/mark3labs/mcp-go v0.54.1
 	github.com/mattn/go-isatty v0.0.22
@@ -45,7 +46,6 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/fatih/semgroup v1.3.0 // indirect
-	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/gitleaks/go-gitdiff v0.9.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
