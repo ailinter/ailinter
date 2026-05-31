@@ -10,16 +10,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.25"
           cache: true
@@ -34,8 +31,8 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.25"
           cache: true
@@ -70,7 +67,7 @@ jobs:
           fi
           echo "✅ Function coverage gate passed (≥70%)"
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage.out
@@ -79,15 +76,15 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.25"
           cache: true
       - name: Build
         run: go build -ldflags "-X main.version=${{ github.ref_name }}" -o bin/ailinter ./cmd/ailinter
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ailinter-linux-amd64
           path: bin/ailinter
@@ -107,8 +104,8 @@ jobs:
           - os: windows
             arch: amd64
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.25"
           cache: true
@@ -121,7 +118,7 @@ jobs:
             -o bin/ailinter-${{ matrix.os }}-${{ matrix.arch }}$suffix \
             ./cmd/ailinter
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ailinter-${{ matrix.os }}-${{ matrix.arch }}
           path: bin/ailinter-${{ matrix.os }}-${{ matrix.arch }}*
@@ -131,15 +128,15 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.25"
           cache: true
       - name: Run benchmarks
         run: go test ./internal/... -bench=. -benchmem -count=3 | tee benchmark.txt
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmarks
           path: benchmark.txt
