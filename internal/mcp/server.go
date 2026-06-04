@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -19,12 +20,64 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// clientNameMap maps known MCP client names to short identifiers for telemetry.
+var clientNameMap = map[string]string{
+	"cursor":         "cursor",
+	"claude":         "claude",
+	"claude desktop": "claude",
+	"claude code":    "claude",
+	"cline":          "cline",
+	"github.copilot": "copilot",
+	"github copilot": "copilot",
+	"copilot":        "copilot",
+	"windsurf":       "windsurf",
+	"continue":       "continue",
+	"cody":           "cody",
+	"goose":          "goose",
+	"sourcegraph":    "cody",
+}
+
+// normalizeClientName converts a raw MCP client name to a short identifier.
+// Falls back to the lowercased name if not in the known mapping.
+func normalizeClientName(name string) string {
+	if name == "" {
+		return "unknown"
+	}
+	lower := strings.ToLower(name)
+	if mapped, ok := clientNameMap[lower]; ok {
+		return mapped
+	}
+	return lower
+}
+
+// clientDetectionHook returns an OnBeforeInitialize hook that auto-detects
+// the MCP client name from the Initialize handshake and sets it on the
+// telemetry package. The AILINTER_MCP_CLIENT env var takes precedence as
+// an explicit override.
+func clientDetectionHook() server.OnBeforeInitializeFunc {
+	return func(ctx context.Context, id any, message *mcp.InitializeRequest) {
+		// Env var takes precedence as explicit override
+		if c := os.Getenv("AILINTER_MCP_CLIENT"); c != "" {
+			telemetry.SetMCPClient(c)
+			return
+		}
+		// Auto-detect from initialize handshake
+		clientName := normalizeClientName(message.Params.ClientInfo.Name)
+		telemetry.SetMCPClient(clientName)
+	}
+}
+
 // Serve starts the MCP server on stdio.
 func Serve(version string) error {
 	s := server.NewMCPServer(
 		"ailinter",
 		version,
 		server.WithToolCapabilities(true),
+		server.WithHooks(&server.Hooks{
+			OnBeforeInitialize: []server.OnBeforeInitializeFunc{
+				clientDetectionHook(),
+			},
+		}),
 	)
 
 	// Tool 1: analyze_code
@@ -50,7 +103,7 @@ func Serve(version string) error {
 	// Tool 3: get_refactoring_strategy
 	s.AddTool(mcp.NewTool(
 		"get_refactoring_strategy",
-		mcp.WithDescription("Get exact step-by-step refactoring instructions for a specific code smell. Includes before/after examples and verification steps."),
+		mcp.WithDescription("🔧 NEXT STEP after analyze_code or assess_file reports issues. Returns exact, actionable refactoring instructions with before/after examples and verification steps. Supports: deep_nesting, brain_method, bumpy_road, complex_conditional, god_class, long_parameter_list, primitive_obsession, duplicated_code."),
 		mcp.WithString("smell_name",
 			mcp.Required(),
 			mcp.Description("The code smell to get a refactoring strategy for (e.g., deep_nesting, brain_method, bumpy_road, complex_conditional, god_class, long_parameter_list, primitive_obsession, duplicated_code)"),
@@ -258,32 +311,99 @@ func handleAssessFile(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallTo
 	return mcp.NewToolResultText(buildAssessmentSummary(result)), nil
 }
 
+// smellRefactoringMap maps detected smell names to their refactoring strategy names.
+func smellRefactoringMap() map[string]string {
+	return map[string]string{
+		"deep_nesting":        "deep_nesting",
+		"brain_method":        "brain_method",
+		"brain_class":         "god_class",
+		"bumpy_road":          "bumpy_road",
+		"complex_conditional": "complex_conditional",
+		"complex_method":      "brain_method",
+		"god_class":           "god_class",
+		"long_parameter_list": "long_parameter_list",
+		"primitive_obsession": "primitive_obsession",
+		"duplicated_code":     "duplicated_code",
+		"message_chains":      "message_chains",
+		"file_bloat":          "file_bloat",
+		"global_data":         "global_data",
+		"lazy_element":        "lazy_element",
+		"paragraph_of_code":   "paragraph_of_code",
+		"excessive_comments":  "excessive_comments",
+		"long_scope_variable": "long_scope_variable",
+		"long_switch":         "long_switch",
+	}
+}
+
+func buildRefactoringSteps(smellNames []string) string {
+	if len(smellNames) == 0 {
+		return ""
+	}
+	smellCalls := make(map[string]bool)
+	for _, name := range smellNames {
+		if strategy, ok := smellRefactoringMap()[name]; ok {
+			smellCalls[strategy] = true
+		}
+	}
+	if len(smellCalls) == 0 {
+		return ""
+	}
+	result := "\n\nREFACTORING STEPS: Call get_refactoring_strategy() for each detected smell:"
+	strategies := make([]string, 0, len(smellCalls))
+	for s := range smellCalls {
+		strategies = append(strategies, s)
+	}
+	sort.Strings(strategies)
+	for _, s := range strategies {
+		result += fmt.Sprintf("\n  - get_refactoring_strategy(%q)", s)
+	}
+	result += "\n  Then refactor in 3-5 small steps, re-running analyze_code after each to verify improvement."
+	return result
+}
+
 func buildAssessmentSummary(result analyzer.QualityResult) string {
 	summary := fmt.Sprintf("%s — Score: %d/100", result.Label, result.Score)
 	if len(result.Smells) > 0 {
 		summary += fmt.Sprintf("\nDetected %d issues:", len(result.Smells))
-		for _, s := range result.Smells {
+		smellNames := make([]string, len(result.Smells))
+		for i, s := range result.Smells {
 			summary += fmt.Sprintf("\n  - %s (%s): %s", s.Name, s.Severity, s.Message)
+			smellNames[i] = s.Name
 		}
+		summary += buildRefactoringSteps(smellNames)
 	}
-	rec := assessmentRecommendation(result.Label)
+	rec := assessmentRecommendation(result.Label, len(result.Smells))
 	if rec != "" {
 		summary += "\n\n" + rec
 	}
 	return summary
 }
 
-func assessmentRecommendation(label string) string {
+func assessmentRecommendation(label string, smellCount int) string {
 	switch label {
 	case analyzer.LabelStopRefactor:
-		return "RECOMMENDATION: Stop & Refactor before AI modification. Run get_refactoring_strategy() for detected issues."
+		return stopRefactorRec(smellCount > 0)
 	case analyzer.LabelNeedsWork:
-		return "RECOMMENDATION: Needs Work — significant complexity issues detected. Refactor incrementally in 3-5 small steps before adding features."
+		return needsWorkRec(smellCount > 0)
 	case analyzer.LabelProceedWithCare:
-		return "RECOMMENDATION: Proceed with Care — use guard clauses and small isolated changes. Re-check after each edit."
+		return "RECOMMENDATION: Proceed with Care — use guard clauses and small isolated changes. Re-check after each edit with analyze_code."
 	default:
 		return ""
 	}
+}
+
+func stopRefactorRec(hasSmells bool) string {
+	if hasSmells {
+		return "RECOMMENDATION: STOP — refactor before any AI modification. Call get_refactoring_strategy() for the specific smell names above. Do NOT modify this file until the score is above 80."
+	}
+	return "RECOMMENDATION: STOP — refactor before any AI modification. The file is in a risky state and cannot be safely edited as-is."
+}
+
+func needsWorkRec(hasSmells bool) string {
+	if hasSmells {
+		return "RECOMMENDATION: Needs Work — significant complexity issues. Use get_refactoring_strategy() for the smells above. Refactor incrementally in 3-5 small steps, re-running analyze_code after each."
+	}
+	return "RECOMMENDATION: Needs Work — significant complexity issues. Refactor incrementally in 3-5 small steps before adding features."
 }
 
 func handleSetConfig(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

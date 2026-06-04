@@ -138,11 +138,32 @@ Every file also gets a vulnerability classification:
 |------|---------|
 | `analyze_code` | Full structural analysis + vulnerability detection with 0–100 score |
 | `scan_for_secrets` | 269-rule secret detection (secrets redacted in output) |
-| `get_refactoring_strategy` | Exact step-by-step refactoring instructions with before/after examples |
-| `assess_file` | Quick classification: Go Ahead / Proceed with Care / Stop & Refactor |
+| `get_refactoring_strategy` | 🔧 NEXT STEP after analyze_code finds issues — exact refactoring steps + before/after examples for 8+ smells |
+| `assess_file` | Quick classification: Go Ahead / Proceed with Care / Stop & Refactor (includes per-smell refactoring recommendations) |
 | `list_hotspots` | Frequently-changed files with low quality scores |
 | `set_config` | Set persistent configuration |
 | `get_config` | View current configuration |
+
+---
+
+## Common Workflow: The Refactoring Loop
+
+This is the **most important ailinter pattern**. Every time your AI assistant modifies code, follow this loop:
+
+```
+1. BEFORE: analyze_code(file) → check the quality score
+2. If score < 80 or smells detected:
+   a. get_refactoring_strategy("smell_name") → exact instructions
+   b. Refactor in 3-5 small steps
+   c. Re-run analyze_code after each step → score improves (42 → 61 → 85 → 97)
+   d. Repeat until score 80+
+3. Make your feature/bugfix change
+4. AFTER: analyze_code(file) → confirm no regression
+5. scan_for_secrets(content) → clean
+6. Commit
+```
+
+**Rule:** If `analyze_code` or `assess_file` reports issues with score < 80, `get_refactoring_strategy` is the mandatory next step. Never skip the refactoring loop.
 
 ---
 

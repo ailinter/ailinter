@@ -29,9 +29,24 @@ const defaultAgentsMD = "# AGENTS.md\n\n" +
 	"- **Code Quality is authoritative.** Treat it as the single source of truth for maintainability.\n" +
 	"- **Target Code Quality 100.** This is the standard for AI-friendly code.\n" +
 	"- **Safeguard all AI-touched code** before suggesting a commit — run `ailinter check` on every changed file.\n" +
-	"- If Code Quality regresses or issues are detected, **refactor — don't declare done.**\n" +
+	"- **If issues are found: the refactoring loop.** Call `get_refactoring_strategy()` → refactor in 3-5 steps → re-run `analyze_code` to confirm improvement. Never skip this loop.\n" +
 	"- Use `ailinter check` to guide **incremental, high-impact refactorings** in 3-5 small steps.\n" +
 	"- When in doubt, **call the appropriate ailinter MCP tool — don't guess.**\n" +
+	"\n" +
+	"---\n\n" +
+	"## Common Workflow: The Refactoring Loop\n\n" +
+	"Whenever you modify code, follow this loop:\n\n" +
+	"```\n" +
+	"1. BEFORE edit: analyze_code(file) → know the score\n" +
+	"2. If score < 95 or smells found:\n" +
+	"   a. get_refactoring_strategy(\"smell_name\") → exact instructions\n" +
+	"   b. Refactor in 3-5 small steps\n" +
+	"   c. Re-run analyze_code after each step → confirm score improves\n" +
+	"3. Make your feature/bugfix change\n" +
+	"4. AFTER edit: analyze_code(file) → no regression\n" +
+	"5. scan_for_secrets(content) → clean\n" +
+	"6. Commit\n" +
+	"```\n" +
 	"\n" +
 	"---\n\n" +
 	"## Available MCP Tools\n\n" +
@@ -39,7 +54,7 @@ const defaultAgentsMD = "# AGENTS.md\n\n" +
 	"|------|---------|\n" +
 	"| `analyze_code` | Full structural analysis + vulnerability detection: quality score (0-100), issues, severity, locations |\n" +
 	"| `scan_for_secrets` | Secret detection: AWS keys, API tokens, private keys, JWT, etc. |\n" +
-	"| `get_refactoring_strategy` | Pattern lookup: returns exact steps + examples for each issue |\n" +
+	"| `get_refactoring_strategy` | 🔧 NEXT STEP after analyze_code finds issues — exact refactoring steps + before/after examples for 8+ smells |\n" +
 	"| `assess_file` | Quick classification: Go Ahead / Proceed with Care / Stop & Refactor |\n" +
 	"\n" +
 	"---\n\n" +
@@ -48,7 +63,7 @@ const defaultAgentsMD = "# AGENTS.md\n\n" +
 	"|-------|-------|-------------|\n" +
 	"| 95-100 | Go Ahead | Safe for AI modification |\n" +
 	"| 75-94 | Proceed with Care | Use guard clauses, prefer small changes, re-check after each edit |\n" +
-	"| 0-74 | Stop & Refactor | Refactor BEFORE AI modification |\n" +
+	"| 0-74 | Stop & Refactor | Refactor BEFORE AI modification — call get_refactoring_strategy first |\n" +
 	"\n" +
 	"---\n\n" +
 	"## Language-Specific Thresholds (Defaults)\n\n" +
@@ -61,6 +76,19 @@ const defaultAgentsMD = "# AGENTS.md\n\n" +
 	"| Max function arguments | 4 | 4 | 4 | 5 |\n" +
 	"\n" +
 	"Customize via `.ailinter.toml` in project root.\n" +
+	"\n" +
+	"---\n\n" +
+	"## Supported Smells for get_refactoring_strategy\n\n" +
+	"| Smell | What It Detects | Strategy |\n" +
+	"|-------|----------------|----------|\n" +
+	"| deep_nesting | Brace level > 3-4 | Guard Clauses + Extract Method |\n" +
+	"| brain_method | Functions > 60-80 LOC | Extract Method decomposition |\n" +
+	"| bumpy_road | Multiple deep blocks | Extract Method per bump |\n" +
+	"| complex_conditional | Excessive &&/|| branches | Introduce Clause + Strategy Pattern |\n" +
+	"| god_class | Too many responsibilities | Extract Class + SRP |\n" +
+	"| long_parameter_list | > 4 parameters | Parameter Object pattern |\n" +
+	"| primitive_obsession | Primitive-type overuse | Type Wrapper + Value Object |\n" +
+	"| duplicated_code | Near-identical blocks | Extract Method + Template Method |\n" +
 	"\n" +
 	"---\n\n" +
 	"## Attribution\n\n" +

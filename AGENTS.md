@@ -5,7 +5,7 @@
 - **Code Quality is authoritative.** Treat it as the single source of truth for maintainability.
 - **Target Code Quality 100.** This is the standard for AI-friendly code.
 - **Safeguard all AI-touched code** before suggesting a commit — delegate to `@ailinter` sub-agent.
-- If Code Quality regresses or issues are detected, **refactor — don't declare done.**
+- **When issues are found: the refactoring loop.** Call `get_refactoring_strategy()` → refactor in 3-5 steps → re-run `analyze_code` to confirm improvement. **Never skip this loop.**
 - Use `@ailinter` sub-agent to guide **incremental, high-impact refactorings** in 3-5 small steps.
 - When in doubt, **call the appropriate ailinter MCP tool — don't guess.**
 
@@ -50,21 +50,24 @@ Two scopes:
 If either reports a regression or new issues:
 
 1. Run `analyze_code` for detailed findings
-2. Refactor in small steps until quality is restored or improved
-3. Do **not** mark changes as ready unless risks are explicitly accepted
+2. Call `get_refactoring_strategy("<smell_name>")` to get exact steps for each detected issue
+3. Refactor in 3-5 small steps until quality is restored or improved
+4. Re-run `analyze_code` after each step to verify improvement
+5. Do **not** mark changes as ready unless risks are explicitly accepted
 
 ### 2. Guide Refactoring with Code Quality
 
-When refactoring or improving code:
+When `analyze_code` or `assess_file` reports code quality issues below 80, follow the **refactoring loop**:
 
-1. Inspect with `analyze_code`
-2. Identify complexity, size, nesting, or other quality issues
-3. Use `get_refactoring_strategy` to get exact refactoring patterns
-4. Refactor in **3-5 small, reviewable steps**, using findings as concrete guidance
+1. Inspect with `analyze_code` — identify the specific smells
+2. For EACH detected smell, call `get_refactoring_strategy("<smell_name>")` — returns exact before/after code examples, step-by-step instructions, and verification steps
+3. Supported smells: `deep_nesting`, `brain_method`, `bumpy_road`, `complex_conditional`, `god_class`, `long_parameter_list`, `primitive_obsession`, `duplicated_code`
+4. Refactor in **3-5 small, reviewable steps**, using the strategy as concrete guidance
 5. After each significant step:
    - Re-run `analyze_code`
    - Confirm measurable improvement (higher score, fewer issues)
    - No regression in ANY area
+6. Repeat the loop until score reaches 80+
 
 ### 3. Catch Go Vet Issues Before Commit (NEW)
 
@@ -226,8 +229,8 @@ If asked to bypass Code Quality safeguards:
 |------|---------|
 | `analyze_code` | Full structural analysis: quality score (0-100), issues, severity, locations |
 | `scan_for_secrets` | Secret detection: AWS keys, API tokens, private keys, JWT, etc. |
-| `get_refactoring_strategy` | Pattern lookup: returns exact steps + examples for each issue |
-| `assess_file` | Quick classification: Go Ahead / Proceed with Care / Stop & Refactor |
+| `get_refactoring_strategy` | 🔧 NEXT STEP after analyze_code finds issues — exact refactoring steps + before/after examples for 8+ smells |
+| `assess_file` | Quick classification: Go Ahead / Proceed with Care / Stop & Refactor (includes per-smell refactoring recommendations) |
 
 ---
 

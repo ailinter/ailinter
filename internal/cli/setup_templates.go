@@ -1,7 +1,7 @@
 package cli
 
 const opencodeAgentConfig = `---
-model: deepseek/deepseek-chat
+model: deepseek/deepseek-v4-flash
 mode: subagent
 description: Dedicated ailinter code scanner. Use for running ` + "`ailinter check`" + ` on files/directories, analyzing code quality, scanning for secrets, detecting vulnerabilities. Delegate all ailinter scans here.
 permission:
@@ -54,9 +54,15 @@ Call ` + "`scan_for_secrets(content)`" + ` on every AI-generated code block befo
 
 **Rule:** Never commit code with detected secrets. Rewrite to use environment variables.
 
-### 3. get_refactoring_strategy(smell_name) — When Issues Found
+### 3. get_refactoring_strategy(smell_name) — The Refactoring Loop 🔧
 
-When ` + "`analyze_code`" + ` reports code smells, call ` + "`get_refactoring_strategy(smell_name)`" + ` to get exact step-by-step refactoring instructions with before/after examples.
+When ` + "`analyze_code`" + ` reports code smells, call ` + "`get_refactoring_strategy(smell_name)`" + ` for exact step-by-step refactoring instructions with before/after examples and verification checks.
+
+**Always follow this loop when smells are found:**
+1. Call ` + "`get_refactoring_strategy(\"smell_name\")`" + ` for each detected smell
+2. Refactor in 3-5 small, reviewable steps
+3. Re-run ` + "`analyze_code`" + ` after each step — confirm score improves
+4. Do NOT proceed until score is 80+
 
 Available patterns: ` + "`deep_nesting`" + `, ` + "`brain_method`" + `, ` + "`bumpy_road`" + `, ` + "`complex_conditional`" + `, ` + "`god_class`" + `, ` + "`long_parameter_list`" + `, ` + "`primitive_obsession`" + `, ` + "`duplicated_code`" + `.
 
@@ -72,19 +78,24 @@ Call ` + "`list_hotspots(repo_path)`" + ` to find files that change frequently A
 
 Use ` + "`set_config(key, value)`" + ` to configure ailinter. Valid keys: ` + "`language`" + `, ` + "`repo_path`" + `, ` + "`enabled_tools`" + `, ` + "`read_only`" + `, ` + "`disable_git`" + `. Use ` + "`get_config`" + ` to view current settings.
 
-## Workflow
+## Workflow: The Refactoring Loop
+
+**This is the most important ailinter pattern.** Whenever analyze_code finds issues:
 
 ` + "```" + `
 User: "Add caching to the getUser function"
 Agent:
   1. Run analyze_code("src/users.go") → Score: 42, At Risk, 3 issues
-  2. Call get_refactoring_strategy("deep_nesting") → Guard Clauses + Extract Method
-  3. Refactor in 3 small steps, re-running analyze_code after each: 42 → 61 → 85 → 97
-  4. Add caching feature
-  5. Run analyze_code after edit → still Clean
-  6. Run scan_for_secrets(content) on new code → clean
-  7. Suggest commit
+  2. ALERT: Must refactor before adding features
+  3. Call get_refactoring_strategy("deep_nesting") → Guard Clauses + Extract Method
+  4. Refactor in 3 small steps, re-running analyze_code after each: 42 → 61 → 85 → 97
+  5. NOW safe to add caching feature
+  6. Run analyze_code after edit → Score: 96 (no regression)
+  7. Run scan_for_secrets(content) on new code → clean
+  8. Suggest commit
 ` + "```" + `
+
+**Rule:** If analyze_code reports any issues with score < 80, you MUST call get_refactoring_strategy() before writing new code. Never skip the refactoring loop.
 `
 
 const opencodeMCPConfig = `{
@@ -92,7 +103,10 @@ const opencodeMCPConfig = `{
     "ailinter": {
       "type": "local",
       "command": ["ailinter", "mcp"],
-      "enabled": true
+      "enabled": true,
+      "env": {
+        "AILINTER_MCP_CLIENT": "cursor"
+      }
     }
   }
 }
@@ -102,7 +116,10 @@ const claudeMCPConfig = `{
   "mcpServers": {
     "ailinter": {
       "command": "ailinter",
-      "args": ["mcp"]
+      "args": ["mcp"],
+      "env": {
+        "AILINTER_MCP_CLIENT": "claude"
+      }
     }
   }
 }
@@ -118,17 +135,19 @@ This project uses ailinter for code quality and security scanning. When making c
 - Run the ailinter ` + "`analyze_code`" + ` tool on the file BEFORE and AFTER changes
 - Code Quality Score 95-100 → safe to modify freely
 - Score 75-94 → use guard clauses, small changes, re-check
-- Score <75 → refactor FIRST before adding features
+- Score <75 → **refactor FIRST** — call ` + "`get_refactoring_strategy`" + ` before adding features
+
+### The Refactoring Loop (Mandatory When Score < 80)
+1. Call ` + "`analyze_code(file)`" + ` — know your baseline score and smells
+2. For EACH smell detected, call ` + "`get_refactoring_strategy(\"smell_name\")`" + ` for exact steps
+3. Refactor in 3-5 small steps, one smell at a time
+4. Re-run ` + "`analyze_code`" + ` after each step — confirm score improves
+5. Do NOT add new features until score is 80+
 
 ### Secret Detection
 - Run ` + "`scan_for_secrets`" + ` on all generated code
 - Never commit hardcoded secrets — use environment variables
 - If secrets found, rewrite before suggesting commit
-
-### Refactoring
-- Use ` + "`get_refactoring_strategy`" + ` to get exact steps for code smells
-- Refactor in 3-5 small, reviewable steps
-- Run ` + "`analyze_code`" + ` after each step to confirm improvement
 
 ### Quick Safety Check
 - Use ` + "`assess_file`" + ` for a quick Go Ahead / Proceed with Care / Stop & Refactor check
@@ -174,7 +193,14 @@ alwaysApply: true
 - Call the ailinter ` + "`analyze_code`" + ` tool on the file
 - Score 95-100 (Go Ahead) → safe to modify
 - Score 75-94 (Proceed with Care) → use guard clauses, re-check after
-- Score <75 (Stop & Refactor) → run ` + "`get_refactoring_strategy`" + ` first
+- Score <75 (Stop & Refactor) → **MUST refactor first** — call ` + "`get_refactoring_strategy`" + ` before touching code
+
+## The Refactoring Loop (Critical Path)
+When ` + "`analyze_code`" + ` finds issues:
+1. Call ` + "`get_refactoring_strategy(\"smell_name\")`" + ` for each detected smell
+2. Refactor in 3-5 small steps
+3. Re-run ` + "`analyze_code`" + ` after each step — verify score improves
+4. Repeat until score is 80+
 
 ## After Every Edit
 - Call ` + "`analyze_code`" + ` again to confirm no regression
@@ -184,12 +210,8 @@ alwaysApply: true
 - Call ` + "`scan_for_secrets`" + ` on all generated code before suggesting commit
 - Never commit hardcoded credentials — use env vars
 
-## Refactoring
-- Get exact steps with ` + "`get_refactoring_strategy(smell_name)`" + `
-- Refactor in 3-5 small steps, verify after each
-
 ## Quick Check
-- ` + "`assess_file`" + ` for a fast tier classification
+- ` + "`assess_file`" + ` for a fast tier classification (includes per-smell refactoring recommendations)
 
 Available smells: deep_nesting, brain_method, bumpy_road, complex_conditional, god_class, long_parameter_list, primitive_obsession, duplicated_code
 `
@@ -198,7 +220,10 @@ const cursorMCPConfig = `{
   "mcpServers": {
     "ailinter": {
       "command": "ailinter",
-      "args": ["mcp"]
+      "args": ["mcp"],
+      "env": {
+        "AILINTER_MCP_CLIENT": "cursor"
+      }
     }
   }
 }
@@ -210,7 +235,14 @@ const copilotInstructions = `# ailinter Code Quality & Security
 - Run the ailinter ` + "`analyze_code`" + ` tool on the file before editing
 - **Score 95-100 (Go Ahead)**: Safe to modify
 - **Score 75-94 (Proceed with Care)**: Make small, focused changes; re-check after each
-- **Score <75 (Stop & Refactor)**: Refactor before adding features — call ` + "`get_refactoring_strategy`" + ` first
+- **Score <75 (Stop & Refactor)**: **MUST refactor first** — call ` + "`get_refactoring_strategy`" + ` before adding features
+
+## The Refactoring Loop (Mandatory)
+When ` + "`analyze_code`" + ` scores < 80:
+1. For each detected smell, call ` + "`get_refactoring_strategy(\"smell_name\")`" + ` for exact steps
+2. Refactor in 3-5 small steps, one smell at a time
+3. Re-run ` + "`analyze_code`" + ` after each step — confirm score improves
+4. Target: score 80+ before adding new features
 
 ## After Every Code Change
 - Re-run ` + "`analyze_code`" + ` to confirm score hasn't decreased
@@ -221,16 +253,11 @@ const copilotInstructions = `# ailinter Code Quality & Security
 - Never commit hardcoded secrets — use environment variables
 - If secrets detected, rewrite code before suggesting commit
 
-## Refactoring
-- Use ` + "`get_refactoring_strategy(smell_name)`" + ` for step-by-step guidance
-- Refactor incrementally: 3-5 small steps, verify each step
-- Target Code Quality 100 for AI-friendly maintainable code
-
 ## Available MCP Tools
 - ` + "`analyze_code(file_path)`" + ` — quality score + issues + vulns
 - ` + "`scan_for_secrets(content)`" + ` — 150+ secret patterns
-- ` + "`get_refactoring_strategy(smell_name)`" + ` — exact refactoring steps
-- ` + "`assess_file(file_path)`" + ` — quick safety tier
+- ` + "`get_refactoring_strategy(smell_name)`" + ` — 🔧 exact refactoring steps (call when analyze_code finds issues)
+- ` + "`assess_file(file_path)`" + ` — quick safety tier (includes per-smell refactoring recommendations)
 - ` + "`list_hotspots(repo_path)`" + ` — priority refactoring targets
 `
 

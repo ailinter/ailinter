@@ -20,6 +20,7 @@ import (
 
 type checkOptions struct {
 	format              FormatMode
+	quiet               bool
 	noSecrets           bool
 	noVulnerabilities   bool
 	secretsOnly         bool
@@ -33,6 +34,7 @@ func CheckCommand() *cobra.Command {
 	var (
 		formatFlag          string
 		jsonFlag            bool
+		quiet               bool
 		noSecrets           bool
 		noVulnerabilities   bool
 		secretsOnly         bool
@@ -63,6 +65,11 @@ Output formats:
   markdown  Markdown formatted (ideal for LLMs)
   problems  GCC-style output for IDE problem matchers (VS Code)
 
+Quiet mode:
+  --quiet, -q  Suppress all analysis output (no results, secrets, vulnerabilities,
+               meta-lint, token estimates, or summaries). Errors are still printed
+               to stderr. Useful for CI when only the exit code matters.
+
 Targeted scans:
   --secrets-only         Scan ONLY for secrets (skip code quality and vulnerabilities)
   --vulnerabilities-only Scan ONLY for vulnerabilities (skip code quality and secrets)
@@ -85,6 +92,7 @@ Token estimation (--estimate-tokens):
 			}
 			opts := checkOptions{
 				format:              mode,
+				quiet:               quiet,
 				noSecrets:           noSecrets,
 				noVulnerabilities:   noVulnerabilities,
 				secretsOnly:         secretsOnly,
@@ -109,12 +117,16 @@ Token estimation (--estimate-tokens):
 	cmd.Flags().BoolVar(&estimateTokens, "estimate-tokens", false, "Show AI token cost estimation after analysis")
 	cmd.Flags().BoolVar(&metaLint, "meta-lint", true, "Run embedded meta-linters (go vet, staticcheck, gofmt, misspell, ineffassign) [default: on]")
 	cmd.Flags().BoolVar(&noMetaLint, "no-meta-lint", false, "Skip embedded meta-linters")
+	cmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "Suppress all output except errors (errors still go to stderr)")
 
 	return cmd
 }
 
 func executeCheck(target string, opts checkOptions, respectGitignore bool) error {
 	flags := map[string]string{}
+	if opts.quiet {
+		flags["quiet"] = "true"
+	}
 	if opts.noSecrets {
 		flags["no-secrets"] = "true"
 	}
@@ -184,14 +196,18 @@ func checkFile(path string, opts checkOptions) error {
 	}
 
 	if opts.secretsOnly {
-		scanAndWriteSecrets(resolved, data, opts.format)
+		if !opts.quiet {
+			scanAndWriteSecrets(resolved, data, opts.format)
+		}
 		telemetry.RecordDuration("check_file", "", time.Since(start).Seconds())
 		return nil
 	}
 	if opts.vulnerabilitiesOnly {
-		vulnScanner := vulnerability.NewScanner()
-		vulnFindings := vulnScanner.Scan(string(data), resolved)
-		writeVulnerabilities(opts.format, resolved, vulnFindings)
+		if !opts.quiet {
+			vulnScanner := vulnerability.NewScanner()
+			vulnFindings := vulnScanner.Scan(string(data), resolved)
+			writeVulnerabilities(opts.format, resolved, vulnFindings)
+		}
 		telemetry.RecordDuration("check_file", "", time.Since(start).Seconds())
 		return nil
 	}
@@ -205,6 +221,11 @@ func checkFile(path string, opts checkOptions) error {
 	telemetry.RecordQualityScore(lang, result.Score)
 	for _, s := range result.Smells {
 		telemetry.RecordSmellsDetected(s.Name, lang, 1)
+	}
+
+	if opts.quiet {
+		telemetry.RecordDuration("check_file", lang, time.Since(start).Seconds())
+		return nil
 	}
 
 	if opts.format == FormatJSON {
@@ -273,12 +294,16 @@ func checkDirectory(dir string, opts checkOptions, respectGitignore bool) error 
 	}
 
 	telemetry.RecordDirScan(ctx.fileCount, ctx.langCount)
-	ctx.writeResults()
+	if !opts.quiet {
+		ctx.writeResults()
+	}
 	if opts.metaLint {
 		// Run meta-linters on the directory (Go mode)
 		mlFindings, err := metalinter.LintGo([]string{resolvedDir})
 		if err == nil && len(mlFindings) > 0 {
-			writeMetaLintFindings(opts.format, mlFindings)
+			if !opts.quiet {
+				writeMetaLintFindings(opts.format, mlFindings)
+			}
 		}
 	}
 	return nil

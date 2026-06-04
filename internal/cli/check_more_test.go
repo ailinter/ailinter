@@ -663,3 +663,210 @@ func TestWriteHumanMetaLint_LineNoColumn(t *testing.T) {
 		t.Errorf("should show line number, got: %s", out)
 	}
 }
+
+func TestCheckFile_QuietMode(t *testing.T) {
+	t.Run("quiet suppresses normal output", func(t *testing.T) {
+		dir := t.TempDir()
+		f := filepath.Join(dir, "main.go")
+		os.WriteFile(f, []byte("package main\nfunc main() {}\n"), 0644)
+
+		opts := checkOptions{
+			format:            FormatHuman,
+			quiet:             true,
+			noSecrets:         true,
+			noVulnerabilities: true,
+		}
+
+		out := captureStdout(func() {
+			err := checkFile(f, opts)
+			if err != nil {
+				t.Fatalf("checkFile in quiet mode should not error: %v", err)
+			}
+		})
+		if out != "" {
+			t.Errorf("quiet mode should produce no stdout output, got: %q", out)
+		}
+	})
+
+	t.Run("quiet suppresses secrets output", func(t *testing.T) {
+		dir := t.TempDir()
+		f := filepath.Join(dir, "keys.go")
+		// This content contains a secret token
+		os.WriteFile(f, []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644)
+
+		opts := checkOptions{
+			format: FormatProblems,
+			quiet:  true,
+		}
+
+		out := captureStdout(func() {
+			err := checkFile(f, opts)
+			if err != nil {
+				t.Fatalf("checkFile in quiet mode should not error: %v", err)
+			}
+		})
+		if out != "" {
+			t.Errorf("quiet mode should suppress secrets output, got: %q", out)
+		}
+	})
+
+	t.Run("quiet suppresses vulnerabilities output", func(t *testing.T) {
+		dir := t.TempDir()
+		f := filepath.Join(dir, "vuln.py")
+		os.WriteFile(f, []byte("import pickle\npickle.loads(data)\n"), 0644)
+
+		opts := checkOptions{
+			format: FormatProblems,
+			quiet:  true,
+		}
+
+		out := captureStdout(func() {
+			err := checkFile(f, opts)
+			if err != nil {
+				t.Fatalf("checkFile in quiet mode should not error: %v", err)
+			}
+		})
+		if out != "" {
+			t.Errorf("quiet mode should suppress vulnerabilities output, got: %q", out)
+		}
+	})
+
+	t.Run("quiet suppresses secrets-only output", func(t *testing.T) {
+		dir := t.TempDir()
+		f := filepath.Join(dir, "keys.go")
+		os.WriteFile(f, []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644)
+
+		opts := checkOptions{
+			format:      FormatProblems,
+			quiet:       true,
+			secretsOnly: true,
+		}
+
+		out := captureStdout(func() {
+			err := checkFile(f, opts)
+			if err != nil {
+				t.Fatalf("checkFile in quiet+secretsOnly should not error: %v", err)
+			}
+		})
+		if out != "" {
+			t.Errorf("quiet mode should suppress secrets-only output, got: %q", out)
+		}
+	})
+
+	t.Run("quiet suppresses vulnerabilities-only output", func(t *testing.T) {
+		dir := t.TempDir()
+		f := filepath.Join(dir, "vuln.py")
+		os.WriteFile(f, []byte("import pickle\npickle.loads(data)\n"), 0644)
+
+		opts := checkOptions{
+			format:              FormatProblems,
+			quiet:               true,
+			vulnerabilitiesOnly: true,
+		}
+
+		out := captureStdout(func() {
+			err := checkFile(f, opts)
+			if err != nil {
+				t.Fatalf("checkFile in quiet+vulnsOnly should not error: %v", err)
+			}
+		})
+		if out != "" {
+			t.Errorf("quiet mode should suppress vulnerabilities-only output, got: %q", out)
+		}
+	})
+
+	t.Run("quiet suppresses JSON output", func(t *testing.T) {
+		dir := t.TempDir()
+		f := filepath.Join(dir, "main.go")
+		os.WriteFile(f, []byte("package main\nfunc main() {}\n"), 0644)
+
+		opts := checkOptions{
+			format: FormatJSON,
+			quiet:  true,
+		}
+
+		out := captureStdout(func() {
+			err := checkFile(f, opts)
+			if err != nil {
+				t.Fatalf("checkFile in quiet+JSON should not error: %v", err)
+			}
+		})
+		if out != "" {
+			t.Errorf("quiet mode should suppress JSON output, got: %q", out)
+		}
+	})
+
+	t.Run("errors still returned", func(t *testing.T) {
+		opts := checkOptions{
+			format: FormatHuman,
+			quiet:  true,
+		}
+		err := checkFile("/nonexistent/path/file.go", opts)
+		if err == nil {
+			t.Fatal("expected error for nonexistent file even in quiet mode")
+		}
+		if !strings.Contains(err.Error(), "cannot") {
+			t.Errorf("expected error about file access, got: %v", err)
+		}
+	})
+}
+
+func TestCheckDirectory_QuietMode(t *testing.T) {
+	t.Run("quiet suppresses all directory output", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "a.go"), []byte("package main\nfunc main() {}\n"), 0644)
+		os.WriteFile(filepath.Join(dir, "b.go"), []byte("package main\nfunc f() {}\n"), 0644)
+
+		opts := checkOptions{
+			format:            FormatHuman,
+			quiet:             true,
+			noSecrets:         true,
+			noVulnerabilities: true,
+		}
+
+		out := captureStdout(func() {
+			err := checkDirectory(dir, opts, false)
+			if err != nil {
+				t.Fatalf("checkDirectory in quiet mode should not error: %v", err)
+			}
+		})
+		if out != "" {
+			t.Errorf("quiet mode should produce no stdout for directory, got: %q", out)
+		}
+	})
+
+	t.Run("quiet suppresses directory with secrets", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "keys.go"), []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644)
+
+		opts := checkOptions{
+			format: FormatProblems,
+			quiet:  true,
+		}
+
+		out := captureStdout(func() {
+			err := checkDirectory(dir, opts, false)
+			if err != nil {
+				t.Fatalf("checkDirectory in quiet mode should not error: %v", err)
+			}
+		})
+		if out != "" {
+			t.Errorf("quiet mode should suppress all directory output, got: %q", out)
+		}
+	})
+}
+
+func TestCheckCommand_QuietFlag(t *testing.T) {
+	cmd := CheckCommand()
+	flag := cmd.Flags().Lookup("quiet")
+	if flag == nil {
+		t.Fatal("--quiet flag not found")
+	}
+	if flag.DefValue != "false" {
+		t.Errorf("expected default false, got %s", flag.DefValue)
+	}
+	// Verify shorthand exists
+	if flag.Shorthand != "q" {
+		t.Errorf("expected shorthand 'q', got %q", flag.Shorthand)
+	}
+}
