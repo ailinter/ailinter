@@ -25,6 +25,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: write   # needed for PR comments
+  security-events: write # needed for SARIF upload to Code Scanning
 
 jobs:
   ailinter-check:
@@ -43,14 +44,28 @@ jobs:
         with:
           quality-threshold: '90'
           fail-on-secrets: 'true'
-          version: 'latest'
+          version: 'v0.8.9'
+
+      # ----------------------------------------------------------------
+      # Generate SARIF report and upload to GitHub Code Scanning
+      # ----------------------------------------------------------------
+      - name: Generate SARIF Report
+        if: always()
+        run: ailinter check . --format sarif --output ailinter-results.sarif
+
+      - name: Upload SARIF to GitHub
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ailinter-results.sarif
+          category: ailinter
 
       # ----------------------------------------------------------------
       # Post a PR comment with the full report (runs even on failure)
       # ----------------------------------------------------------------
       - name: Post PR Comment
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           QUALITY_SCORE: ${{ steps.ailinter.outputs.quality-score }}
           SECRETS_FOUND: ${{ steps.ailinter.outputs.secrets-found }}
