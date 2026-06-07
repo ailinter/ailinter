@@ -49,9 +49,21 @@ jobs:
       # ----------------------------------------------------------------
       # Generate SARIF report and upload to GitHub Code Scanning
       # ----------------------------------------------------------------
+      # Build from local source to include unreleased SARIF improvements
+      # (security-severity scoring, stable rule names, etc.).
+      - name: Set up Go
+        if: always()
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build AILINTER from source
+        if: always()
+        run: go build -o /tmp/ailinter-head ./cmd/ailinter/
+
       - name: Generate SARIF Report
         if: always()
-        run: ailinter check . --format sarif --output ailinter-results.sarif
+        run: /tmp/ailinter-head check . --format sarif --output ailinter-results.sarif
 
       - name: Upload SARIF to GitHub
         if: always()
