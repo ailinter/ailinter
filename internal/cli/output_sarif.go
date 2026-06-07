@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -55,8 +56,8 @@ type SARIFRule struct {
 
 // SARIFProperties holds optional metadata on a rule.
 type SARIFProperties struct {
-	Category         string  `json:"category,omitempty"`
-	SecuritySeverity float64 `json:"security-severity,omitempty"`
+	Category         string `json:"category,omitempty"`
+	SecuritySeverity string `json:"security-severity,omitempty"`
 }
 
 // SARIFResult is a single finding in a SARIF run.
@@ -342,7 +343,7 @@ func buildSARIFRules(entries []sarifEntry) ([]SARIFRule, map[string]int) {
 			HelpURI: helpURI,
 			Properties: SARIFProperties{
 				Category:         e.category,
-				SecuritySeverity: ruleMaxSev[e.ruleID],
+				SecuritySeverity: fmt.Sprintf("%.1f", ruleMaxSev[e.ruleID]),
 			},
 		})
 	}

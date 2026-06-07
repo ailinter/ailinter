@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"strconv"
 	"testing"
 
 	"github.com/ailinter/ailinter/internal/analyzer"
@@ -289,14 +290,24 @@ func TestSARIFRulesHaveSecuritySeverity(t *testing.T) {
 
 	for _, rule := range run.Tool.Driver.Rules {
 		t.Run(rule.ID, func(t *testing.T) {
+			// Parse security-severity string to float for validation
+			var sevFloat float64
+			if rule.Properties.SecuritySeverity != "" {
+				var err error
+				sevFloat, err = strconv.ParseFloat(rule.Properties.SecuritySeverity, 64)
+				if err != nil {
+					t.Fatalf("rule %q has invalid security-severity string %q: %v",
+						rule.ID, rule.Properties.SecuritySeverity, err)
+				}
+			}
 			// Every rule must have a security-severity or the GitHub taxonomy won't work
-			if rule.Properties.SecuritySeverity == 0 {
+			if sevFloat == 0 {
 				t.Errorf("rule %q has security-severity = 0, expected non-zero", rule.ID)
 			}
 			// Must be in valid range
-			if rule.Properties.SecuritySeverity < 0.0 || rule.Properties.SecuritySeverity > 10.0 {
+			if sevFloat < 0.0 || sevFloat > 10.0 {
 				t.Errorf("rule %q has security-severity = %.1f, outside valid range [0.0, 10.0]",
-					rule.ID, rule.Properties.SecuritySeverity)
+					rule.ID, sevFloat)
 			}
 			// Must have a stable name (not the raw ruleID)
 			if rule.Name == rule.ID {
