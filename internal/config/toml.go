@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ailinter/ailinter/internal/parser"
 	"github.com/pelletier/go-toml/v2"
@@ -10,8 +11,14 @@ import (
 
 // UserConfig mirrors .ailinter.toml structure.
 type UserConfig struct {
-	Extends string       `toml:"extends"`
-	Rules   RulesSection `toml:"rules"`
+	Extends string         `toml:"extends"`
+	Rules   RulesSection   `toml:"rules"`
+	Exclude ExcludeSection `toml:"exclude"`
+}
+
+// ExcludeSection holds file/directory exclusion patterns.
+type ExcludeSection struct {
+	Files []string `toml:"files"`
 }
 
 // RulesSection holds per-detector overrides.
@@ -98,6 +105,62 @@ func LoadProjectThresholds(dir, lang string) parser.Thresholds {
 
 	mergeOverrides(&t, &uc)
 	return t
+}
+
+// FindConfigDir walks upward from dir to find the directory containing .ailinter.toml.
+func FindConfigDir(dir string) string {
+	cfgPath := findConfig(dir)
+	if cfgPath == "" {
+		return ""
+	}
+	return filepath.Dir(cfgPath)
+}
+
+// LoadExcludedFiles returns the list of excluded file/directory patterns from
+// .ailinter.toml, walking upward from dir. Returns nil if no config or no exclude section.
+func LoadExcludedFiles(dir string) []string {
+	cfgPath := findConfig(dir)
+	if cfgPath == "" {
+		return nil
+	}
+
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		return nil
+	}
+
+	var uc UserConfig
+	if err := toml.Unmarshal(data, &uc); err != nil {
+		return nil
+	}
+
+	return uc.Exclude.Files
+}
+
+// IsExcluded checks if a file path (relative to configDir) matches any exclude pattern.
+// Patterns ending in "/" match directory prefixes; other patterns match exact paths.
+func IsExcluded(filePath string, excludePats []string, configDir string) bool {
+	if len(excludePats) == 0 {
+		return false
+	}
+	rel, err := filepath.Rel(configDir, filePath)
+	if err != nil {
+		return false
+	}
+	for _, pat := range excludePats {
+		if strings.HasSuffix(pat, "/") {
+			// Directory prefix match
+			if strings.HasPrefix(rel, pat) {
+				return true
+			}
+		} else {
+			// Exact match
+			if rel == pat {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func findConfig(dir string) string {

@@ -252,10 +252,13 @@ func checkDirectoryDiff(resolvedDir, repoRoot string, changedSet map[string]bool
 	scanSecrets := !opts.noSecrets || opts.secretsOnly               // gitleaks:allow
 	scanVulns := !opts.noVulnerabilities || opts.vulnerabilitiesOnly // gitleaks:allow
 
+	configDir := config.FindConfigDir(resolvedDir)
 	ctx := &walkContext{
 		opts:           opts,
 		resolvedDir:    resolvedDir,
 		gitignorePats:  nil,
+		excludePats:    config.LoadExcludedFiles(resolvedDir),
+		configDir:      configDir,
 		scanQuality:    scanQuality,
 		scanner:        nil,
 		vulnScanner:    nil,
@@ -312,6 +315,17 @@ func checkFile(path string, opts checkOptions, diffRanges ...git.LineRange) erro
 	resolved, err := resolveSafePath(path)
 	if err != nil {
 		return err
+	}
+
+	// Check if this file is excluded via .ailinter.toml
+	resolvedDir := filepath.Dir(resolved)
+	excludePats := config.LoadExcludedFiles(resolvedDir)
+	configDir := config.FindConfigDir(resolvedDir)
+	if len(excludePats) > 0 && configDir != "" && config.IsExcluded(resolved, excludePats, configDir) {
+		if !opts.quiet {
+			fmt.Fprintf(os.Stderr, "skipped (excluded by .ailinter.toml): %s\n", resolved)
+		}
+		return nil
 	}
 
 	data, err := os.ReadFile(resolved)
@@ -471,10 +485,13 @@ func checkDirectory(dir string, opts checkOptions, respectGitignore bool) error 
 	scanSecrets := !opts.noSecrets || opts.secretsOnly               // gitleaks:allow
 	scanVulns := !opts.noVulnerabilities || opts.vulnerabilitiesOnly // gitleaks:allow
 
+	configDir := config.FindConfigDir(resolvedDir)
 	ctx := &walkContext{
 		opts:          opts,
 		resolvedDir:   resolvedDir,
 		gitignorePats: nil,
+		excludePats:   config.LoadExcludedFiles(resolvedDir),
+		configDir:     configDir,
 		scanQuality:   scanQuality,
 		scanner:       nil,
 		vulnScanner:   nil,
@@ -531,6 +548,8 @@ type walkContext struct {
 	opts          checkOptions
 	resolvedDir   string
 	gitignorePats []string
+	excludePats   []string
+	configDir     string
 	scanQuality   bool
 	scanner       *secrets.Scanner
 	vulnScanner   *vulnerability.Scanner
@@ -611,8 +630,16 @@ func (ctx *walkContext) walkFn(path string, d os.DirEntry, err error) error {
 }
 
 func (ctx *walkContext) shouldSkipFile(path string) bool {
-	return !isSourceFile(path) ||
-		(len(ctx.gitignorePats) > 0 && isGitignored(path, ctx.resolvedDir, ctx.gitignorePats))
+	if !isSourceFile(path) {
+		return true
+	}
+	if len(ctx.gitignorePats) > 0 && isGitignored(path, ctx.resolvedDir, ctx.gitignorePats) {
+		return true
+	}
+	if len(ctx.excludePats) > 0 && config.IsExcluded(path, ctx.excludePats, ctx.configDir) {
+		return true
+	}
+	return false
 }
 
 func (ctx *walkContext) writeResults() {

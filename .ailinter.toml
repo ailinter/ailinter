@@ -60,6 +60,7 @@ read_only = false
 files = [
     "internal/secrets/betterleaks.toml",
     "internal/vulnerability/scanner.go",
+    "internal/vulnerability/scanner_test.go",
     "internal/secrets/scanner_test.go",
     "internal/secrets/scanner_coverage_test.go",
     "internal/secrets/scanner_internal_test.go",
