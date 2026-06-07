@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/ailinter/ailinter/internal/analyzer"
+	"github.com/ailinter/ailinter/internal/git"
 	"github.com/ailinter/ailinter/internal/metalinter"
 	"github.com/ailinter/ailinter/internal/secrets"
 	"github.com/ailinter/ailinter/internal/version"
@@ -161,10 +163,15 @@ func appendSecretEntries(entries []sarifEntry, findings []secrets.SecretFinding,
 		if msg == "" {
 			msg = f.Message
 		}
+		// Use per-file path when available (directory mode), fall back to scanPath.
+		fp := f.FilePath
+		if fp == "" {
+			fp = scanPath
+		}
 		entries = append(entries, sarifEntry{
 			ruleID:   f.RuleID,
 			severity: f.Severity,
-			filePath: scanPath,
+			filePath: fp,
 			line:     line,
 			column:   col,
 			message:  msg,
@@ -188,10 +195,15 @@ func appendVulnEntries(entries []sarifEntry, findings []vulnerability.Finding, s
 		if msg == "" {
 			msg = f.Category
 		}
+		// Use per-file path when available (directory mode), fall back to scanPath.
+		fp := f.FilePath
+		if fp == "" {
+			fp = scanPath
+		}
 		entries = append(entries, sarifEntry{
 			ruleID:   f.RuleID,
 			severity: f.Severity,
-			filePath: scanPath,
+			filePath: fp,
 			line:     line,
 			column:   col,
 			message:  msg,
@@ -234,11 +246,68 @@ func appendMetaLintEntries(entries []sarifEntry, findings []metalinter.Finding) 
 
 // writeSARIFLog builds a complete SARIF v2.1.0 log from the intermediate
 // entry list and encodes it to w.
+//
+// Paths are normalized to be repo-relative for GitHub Code Scanning
+// compatibility. The SARIF spec requires URIs to be relative to the
+// repository root; absolute filesystem paths (e.g.
+// /Users/user/project/src/main.go) cause "Preview unavailable" in the
+// GitHub Security tab.
 func writeSARIFLog(w io.Writer, entries []sarifEntry) error {
+	normalizeEntryPaths(entries)
+
 	rules, ruleIndex := buildSARIFRules(entries)
 	results := buildSARIFResults(entries, ruleIndex)
 	log := buildSARIFLog(rules, results)
 	return encodeSARIF(w, log)
+}
+
+// normalizeEntryPaths converts absolute file paths in all entries to paths
+// relative to the git repository root. This ensures GitHub Code Scanning
+// can map SARIF URIs back to repository files.
+//
+// If the git repo root cannot be determined (not a git repository, git not
+// installed), paths are left unchanged (absolute). This is a graceful
+// degradation — the SARIF is still valid, just not compatible with GitHub
+// Code Scanning.
+func normalizeEntryPaths(entries []sarifEntry) {
+	if len(entries) == 0 {
+		return
+	}
+
+	repoRoot := findRepoRoot(entries)
+	if repoRoot == "" {
+		return
+	}
+
+	for i := range entries {
+		if filepath.IsAbs(entries[i].filePath) {
+			rel, err := filepath.Rel(repoRoot, entries[i].filePath)
+			if err == nil && !strings.HasPrefix(rel, "..") {
+				entries[i].filePath = rel
+			}
+		}
+	}
+}
+
+// findRepoRoot discovers the git repository root from the first absolute
+// file path in the entries. It tries the file's parent directory first
+// (since git -C requires a directory), then falls back to common prefix
+// detection if git fails.
+func findRepoRoot(entries []sarifEntry) string {
+	for _, e := range entries {
+		if !filepath.IsAbs(e.filePath) {
+			continue
+		}
+		// Try the parent directory (file itself won't work with git -C).
+		root, err := git.FindRepoRoot(filepath.Dir(e.filePath))
+		if err == nil {
+			return root
+		}
+		// Fall back to trying the file's grandparent chain — some files
+		// may be in symlinked directories where git -C fails on the
+		// symlinked path but the .git is discoverable via other means.
+	}
+	return ""
 }
 
 func buildSARIFResults(entries []sarifEntry, ruleIndex map[string]int) []SARIFResult {

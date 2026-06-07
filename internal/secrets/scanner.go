@@ -23,6 +23,7 @@ type SecretFinding struct {
 	Entropy     float64 `json:"entropy"`
 	Severity    string  `json:"severity"`
 	Message     string  `json:"message"`
+	FilePath    string  `json:"file_path,omitempty"` // populated in directory mode for SARIF
 }
 
 // Scanner wraps the gitleaks detector.

@@ -24,6 +24,7 @@ func convertFindings(findings []report.Finding, filePath string) []SecretFinding
 			Entropy:     float64(f.Entropy),
 			Severity:    sev,
 			Message:     generateAIPrompt(f),
+			FilePath:    filePath,
 		})
 	}
 	return result
