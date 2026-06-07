@@ -10,6 +10,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  code-quality: write
+
 jobs:
   lint:
     name: Lint
@@ -32,6 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-go@v6
         with:
           go-version: "1.25"
@@ -66,6 +72,17 @@ jobs:
             exit 1
           fi
           echo "✅ Function coverage gate passed (≥70%)"
+      - name: Install gocover-cobertura
+        run: go install github.com/boumenot/gocover-cobertura@latest
+      - name: Convert coverage to Cobertura XML
+        run: gocover-cobertura < coverage.out > coverage.xml
+      - name: Upload coverage to GitHub
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: coverage.xml
+          language: Go
+          label: code-coverage/go-test
       - name: Upload coverage
         uses: actions/upload-artifact@v7
         with:
