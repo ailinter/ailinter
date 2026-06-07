@@ -692,7 +692,7 @@ func TestCheckFile_QuietMode(t *testing.T) {
 		dir := t.TempDir()
 		f := filepath.Join(dir, "keys.go")
 		// This content contains a secret token
-		os.WriteFile(f, []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644)
+		os.WriteFile(f, []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644) // gitleaks:allow
 
 		opts := checkOptions{
 			format: FormatProblems,
@@ -734,7 +734,7 @@ func TestCheckFile_QuietMode(t *testing.T) {
 	t.Run("quiet suppresses secrets-only output", func(t *testing.T) {
 		dir := t.TempDir()
 		f := filepath.Join(dir, "keys.go")
-		os.WriteFile(f, []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644)
+		os.WriteFile(f, []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644) // gitleaks:allow
 
 		opts := checkOptions{
 			format:      FormatProblems,
@@ -837,7 +837,7 @@ func TestCheckDirectory_QuietMode(t *testing.T) {
 
 	t.Run("quiet suppresses directory with secrets", func(t *testing.T) {
 		dir := t.TempDir()
-		os.WriteFile(filepath.Join(dir, "keys.go"), []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644)
+		os.WriteFile(filepath.Join(dir, "keys.go"), []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644) // gitleaks:allow
 
 		opts := checkOptions{
 			format: FormatProblems,

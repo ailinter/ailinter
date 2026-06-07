@@ -1,0 +1,144 @@
+# AILINTER PR Check — dogfoods .github/actions/ailinter-check
+#
+# Runs on every pull request and push to main. Scans the repository with
+# AILINTER's own tools and posts a summary comment on PRs.
+#
+# Other repositories can reuse the composite action directly:
+#
+#   - uses: ailinter/ailinter/.github/actions/ailinter-check@main
+#     with:
+#       quality-threshold: 85
+#       fail-on-secrets: true
+
+name: AILINTER PR Check
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write   # needed for PR comments
+
+jobs:
+  ailinter-check:
+    name: Code Quality & Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # ----------------------------------------------------------------
+      # Use the composite action for install + scan + results
+      # ----------------------------------------------------------------
+      - name: Run AILINTER Check
+        id: ailinter
+        uses: ./.github/actions/ailinter-check
+        with:
+          quality-threshold: '90'
+          fail-on-secrets: 'true'
+          version: 'latest'
+
+      # ----------------------------------------------------------------
+      # Post a PR comment with the full report (runs even on failure)
+      # ----------------------------------------------------------------
+      - name: Post PR Comment
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          QUALITY_SCORE: ${{ steps.ailinter.outputs.quality-score }}
+          SECRETS_FOUND: ${{ steps.ailinter.outputs.secrets-found }}
+          ISSUES_FOUND: ${{ steps.ailinter.outputs.issues-found }}
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Build comment body from saved report files
+            let body = '';
+
+            // Summary markdown
+            if (fs.existsSync('/tmp/ailinter-summary.md')) {
+              body += fs.readFileSync('/tmp/ailinter-summary.md', 'utf8');
+            }
+
+            // Quality details (collapsible, first 200 lines to keep PRs readable)
+            if (fs.existsSync('/tmp/ailinter-quality.txt')) {
+              const quality = fs.readFileSync('/tmp/ailinter-quality.txt', 'utf8').trim();
+              if (quality) {
+                const lines = quality.split('\n');
+                const truncated = lines.length > 200;
+                const display = truncated ? lines.slice(0, 200).join('\n') : quality;
+                body += '\n<details><summary>📋 Code Quality Details (' +
+                        lines.length + ' lines)</summary>\n\n```\n';
+                body += display;
+                if (truncated) body += '\n... (truncated, see workflow logs for full output)';
+                body += '\n```\n</details>\n';
+              }
+            }
+
+            // Secret details (collapsible)
+            if (fs.existsSync('/tmp/ailinter-secrets.txt')) {
+              const secrets = fs.readFileSync('/tmp/ailinter-secrets.txt', 'utf8').trim();
+              if (secrets) {
+                const lines = secrets.split('\n');
+                const truncated = lines.length > 100;
+                const display = truncated ? lines.slice(0, 100).join('\n') : secrets;
+                body += '\n<details><summary>🔒 Secret Scan Details (' +
+                        lines.length + ' findings)</summary>\n\n```\n';
+                body += display;
+                if (truncated) body += '\n... (truncated)';
+                body += '\n```\n</details>\n';
+              }
+            }
+
+            // Run link
+            body += '\n---\n';
+            body += '_View full output in the [workflow run](' +
+                    context.serverUrl + '/' + context.repo.owner + '/' +
+                    context.repo.repo + '/actions/runs/' + context.runId + ')._';
+
+            // Post or update the comment (find existing AILINTER comment first)
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body && c.body.includes('AILINTER Code Quality Report')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                comment_id: botComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body,
+              });
+            }
+
+      # ----------------------------------------------------------------
+      # Fail job if AILINTER checks failed (for CI status)
+      # ----------------------------------------------------------------
+      - name: Fail if Checks Failed
+        if: steps.ailinter.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "::error::AILINTER quality or secret checks failed."
+          echo "Quality score: ${{ steps.ailinter.outputs.quality-score }}"
+          echo "Secrets found: ${{ steps.ailinter.outputs.secrets-found }}"
+          echo "Issues found:  ${{ steps.ailinter.outputs.issues-found }}"
+          exit 1

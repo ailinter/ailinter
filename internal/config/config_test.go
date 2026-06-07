@@ -107,7 +107,7 @@ func TestSet_OnPremURL(t *testing.T) {
 
 func TestSet_AccessToken(t *testing.T) {
 	os.Setenv("HOME", t.TempDir())
-	config.Set("access_token", "test-token-123")
+	config.Set("access_token", "test-token-123") // gitleaks:allow
 	c, _ := config.Load()
 	if c.AccessToken != "test-token-123" {
 		t.Error("access_token not set")

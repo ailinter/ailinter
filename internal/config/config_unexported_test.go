@@ -34,7 +34,7 @@ func TestGetConfig_RedactsAccessToken(t *testing.T) {
 	os.Setenv("HOME", t.TempDir())
 	defer os.Setenv("HOME", oldHome)
 
-	Set("access_token", "sk-live-secret-token-value-123")
+	Set("access_token", "sk-live-secret-token-value-123") // gitleaks:allow
 
 	cfg, err := GetConfig()
 	if err != nil {
@@ -67,7 +67,7 @@ func TestSetAndGet_RedactsAccessToken(t *testing.T) {
 	os.Setenv("HOME", t.TempDir())
 	defer os.Setenv("HOME", oldHome)
 
-	cfg, err := SetAndGet("access_token", "my-secret-token-abc123")
+	cfg, err := SetAndGet("access_token", "my-secret-token-abc123") // gitleaks:allow
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestSet_RedactsAccessTokenInReturn(t *testing.T) {
 	os.Setenv("HOME", t.TempDir())
 	defer os.Setenv("HOME", oldHome)
 
-	result, err := Set("access_token", "secret-value-12345")
+	result, err := Set("access_token", "secret-value-12345") // gitleaks:allow
 	if err != nil {
 		t.Fatal(err)
 	}

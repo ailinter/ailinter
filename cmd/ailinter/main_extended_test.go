@@ -138,7 +138,7 @@ func TestPrintTelemetryInfo(t *testing.T) {
 		"files.analyzed",
 		"installations",
 		"quality.score",
-		"smells.detected",
+		"smells.detected", // gitleaks:allow
 		"secrets.detected",
 		"duration.seconds",
 		"errors",

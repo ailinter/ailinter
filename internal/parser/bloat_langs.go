@@ -115,9 +115,7 @@ func extractRubyFuncName(line string, kw string) string {
 	rest := strings.TrimPrefix(line, kw)
 	rest = strings.TrimSpace(rest)
 	// Handle self.method_name
-	if strings.HasPrefix(rest, "self.") {
-		rest = rest[5:]
-	}
+	rest = strings.TrimPrefix(rest, "self.")
 	idx := strings.IndexAny(rest, " (\n")
 	if idx == -1 {
 		idx = len(rest)
@@ -521,9 +519,7 @@ func extractFuncNameRust(line string) string {
 
 func extractPythonFuncName(line string) string {
 	l := line
-	if strings.HasPrefix(l, "async ") {
-		l = l[6:]
-	}
+	l = strings.TrimPrefix(l, "async ")
 	l = strings.TrimPrefix(l, "def ")
 	idx := strings.Index(l, "(")
 	if idx == -1 {

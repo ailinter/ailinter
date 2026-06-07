@@ -4,25 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime/debug"
 
 	"github.com/ailinter/ailinter/internal/cli"
 	"github.com/ailinter/ailinter/internal/telemetry"
+	"github.com/ailinter/ailinter/internal/version"
 	"github.com/spf13/cobra"
 )
 
-var version = "v0.8.6"
-
-func init() {
-	if info, ok := debug.ReadBuildInfo(); ok {
-		if v := info.Main.Version; v != "" && v != "(devel)" {
-			version = v
-		}
-	}
-}
-
 func main() {
-	telemetry.Version = version
+	telemetry.Version = version.Version
 	telemetry.Init(context.Background())
 	defer telemetry.Shutdown(context.Background())
 
@@ -31,8 +21,9 @@ func main() {
 	root := newRootCommand()
 	root.AddCommand(cli.CheckCommand())
 	root.AddCommand(cli.ReportCommand())
-	root.AddCommand(cli.MCPCommand(version))
+	root.AddCommand(cli.MCPCommand(version.Version))
 	root.AddCommand(cli.InitCommand())
+	root.AddCommand(cli.InstallHookCommand())
 	root.AddCommand(rulesCommand())
 	root.AddCommand(telemetryCommand())
 
@@ -55,7 +46,7 @@ Provides four pillars of protection:
   4. IaC + Dependency Guard — catch infrastructure misconfigurations and hallucinated packages
 
 Run as a CLI tool or an MCP server for AI assistants.`,
-		Version: version,
+		Version: version.Version,
 	}
 }
 

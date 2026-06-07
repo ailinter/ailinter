@@ -113,19 +113,6 @@ func DetectParagraphOfCode(lines []string, maxConsecutive int) []Smell {
 	return smells
 }
 
-func deduplicateSmells(smells []Smell) []Smell {
-	seen := make(map[string]bool)
-	var result []Smell
-	for _, s := range smells {
-		key := fmt.Sprintf("%s:%d:%s", s.Name, s.LineStart, s.Severity)
-		if !seen[key] {
-			seen[key] = true
-			result = append(result, s)
-		}
-	}
-	return result
-}
-
 // DetectExcessiveComments flag files where comment lines exceed a ratio of total lines.
 func DetectExcessiveComments(lines []string, ratioThreshold float64) *Smell {
 	if len(lines) < 10 {

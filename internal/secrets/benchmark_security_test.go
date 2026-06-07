@@ -318,15 +318,15 @@ func generateLargeCorpus(sizeKB int) string {
 
 func handler%d(w http.ResponseWriter, r *http.Request) {
     user := r.URL.Query().Get("user")
-    _, _ = fmt.Fprintf(w, "Hello %s", user)
+    _, _ = fmt.Fprintf(w, "Hello %%s", user)
     db.Query("SELECT * FROM users WHERE name = '" + user + "'")
-    var key = "sk_test_%s"
+    var key = "sk_test_%%s"
 }
 `
 	filler := strings.Repeat("// filler line to reach target size\n", 20)
 	sb.WriteString(filler)
 	for i := 0; i < sizeKB/2; i++ {
-		sb.WriteString(fmt.Sprintf(template, i, fmt.Sprintf("%024d", i)))
+		sb.WriteString(fmt.Sprintf(template, i))
 	}
 	return sb.String()
 }

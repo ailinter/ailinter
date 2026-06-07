@@ -81,7 +81,7 @@ func TestHandleScanForSecrets_Valid(t *testing.T) {
 	result, err := handleScanForSecrets(context.Background(), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Arguments: map[string]interface{}{
-				"content": "var key = \"sk_live_1234567890abcdef\"\n",
+				"content": "var key = \"sk_live_1234567890abcdef\"\n", // gitleaks:allow
 			},
 		},
 	})
@@ -302,7 +302,7 @@ func TestHandleSetConfig_ReadOnly(t *testing.T) {
 func TestHandleSetConfig_InvalidKey(t *testing.T) {
 	result, err := handleSetConfig(context.Background(), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
-			Arguments: map[string]interface{}{"key": "nonexistent", "value": "x"},
+			Arguments: map[string]interface{}{"key": "nonexistent", "value": "x"}, // gitleaks:allow
 		},
 	})
 	if err != nil {

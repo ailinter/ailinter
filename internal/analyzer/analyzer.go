@@ -33,7 +33,7 @@ func DetectedLanguage(ext string) string {
 
 func AnalyzeGitHotspots(repoPath string, maxDepth int) GitHotspotResult {
 	result := parser.AnalyzeGitHotspots(repoPath, maxDepth)
-	if result.Error != "" {
+	if result.Error != "" { // gitleaks:allow
 		return result
 	}
 	if len(result.Entries) == 0 {
@@ -117,9 +117,7 @@ func Analyze(src SourceInput, t Thresholds) QualityResult {
 }
 func detectFunctionSmells(lines []string, bloats []FunctionBloat, t Thresholds) []Smell {
 	var smells []Smell
-	for _, s := range parser.DetectBrainMethodSmell(bloats, t.FuncLOCWarning, t.FuncLOCAlert) {
-		smells = append(smells, s)
-	}
+	smells = append(smells, parser.DetectBrainMethodSmell(bloats, t.FuncLOCWarning, t.FuncLOCAlert)...)
 
 	for _, fn := range bloats {
 		funcLines := sliceFuncBody(lines, fn)

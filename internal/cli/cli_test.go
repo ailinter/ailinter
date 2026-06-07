@@ -215,11 +215,11 @@ func TestCLI_NoVulnerabilitiesFlag(t *testing.T) {
 func TestCLI_NoVulnerabilitiesWithNoSecrets(t *testing.T) {
 	bin := buildBinary(t)
 	dir := t.TempDir()
-	src := "import pickle\npickle.loads(data)\nAPI_KEY = 'sk_live_1234567890abcdef'\n"
+	src := "import pickle\npickle.loads(data)\nAPI_KEY = 'sk_live_1234567890abcdef'\n" // gitleaks:allow
 	f := filepath.Join(dir, "vuln.py")
 	os.WriteFile(f, []byte(src), 0644)
 
-	out, _ := exec.Command(bin, "check", "--format", "json", "--no-secrets", "--no-vulnerabilities", f).CombinedOutput()
+	out, _ := exec.Command(bin, "check", "--format", "json", "--no-secrets", "--no-vulnerabilities", f).CombinedOutput() // gitleaks:allow
 	s := string(out)
 
 	if strings.Contains(s, "\"secret_scan\"") && !strings.Contains(s, "\"secret_scan\":[]") && !strings.Contains(s, "\"secret_scan\": []") {
@@ -323,8 +323,8 @@ func TestCLI_ProblemsFormatHasFileLine(t *testing.T) {
 	if !strings.Contains(s, "deep.go:") {
 		t.Errorf("problems format should contain file:line prefix: %s", s)
 	}
-	if strings.Contains(s, "\n\n") {
-		// Just checking we get output
+	if !strings.Contains(s, "\n\n") {
+		t.Log("problems format output does not contain blank line separators")
 	}
 }
 
@@ -504,6 +504,161 @@ func TestCLI_InitVSCodePlusAgent(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".githooks", "pre-commit")); err != nil {
 		t.Error(".githooks/pre-commit not created")
+	}
+}
+
+func TestCLI_InstallHook(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+
+	// Initialize a git repo.
+	cmd := exec.Command("git", "init")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git init failed: %v\n%s", err, out)
+	}
+
+	// Run install-hook.
+	cmd = exec.Command(bin, "install-hook")
+	cmd.Dir = dir
+	out, err = cmd.CombinedOutput()
+	t.Logf("install-hook output:\n%s", out)
+	if err != nil {
+		t.Fatalf("install-hook failed: %v\n%s", err, out)
+	}
+
+	// Verify hook was created.
+	hookPath := filepath.Join(dir, ".git", "hooks", "pre-commit")
+	if _, err := os.Stat(hookPath); err != nil {
+		t.Fatal(".git/hooks/pre-commit not created")
+	}
+	data, _ := os.ReadFile(hookPath)
+	if !strings.Contains(string(data), "ailinter pre-commit quality gate") {
+		t.Error("hook should contain ailinter quality gate header")
+	}
+
+	// Check that the hook is executable.
+	fi, err := os.Stat(hookPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm()&0111 == 0 {
+		t.Error("hook should be executable")
+	}
+}
+
+func TestCLI_InstallHook_Idempotent(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+
+	cmd := exec.Command("git", "init")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git init failed: %v\n%s", err, out)
+	}
+
+	// First run.
+	cmd = exec.Command(bin, "install-hook")
+	cmd.Dir = dir
+	out, err = cmd.CombinedOutput()
+	t.Logf("first run output:\n%s", out)
+	if err != nil {
+		t.Fatalf("first install-hook failed: %v\n%s", err, out)
+	}
+
+	// Verify hook was installed and get hash.
+	hookPath := filepath.Join(dir, ".git", "hooks", "pre-commit")
+	data, _ := os.ReadFile(hookPath)
+	firstContent := string(data)
+
+	// Second run — should be idempotent.
+	cmd = exec.Command(bin, "install-hook")
+	cmd.Dir = dir
+	out, err = cmd.CombinedOutput()
+	t.Logf("second run output:\n%s", out)
+	if err != nil {
+		t.Fatalf("second install-hook failed: %v\n%s", err, out)
+	}
+
+	// Content should not have changed.
+	data, _ = os.ReadFile(hookPath)
+	if string(data) != firstContent {
+		t.Error("hook content changed after second install-hook run")
+	}
+
+	// No backup should exist (no hook was replaced).
+	if _, err := os.Stat(hookPath + ".backup"); err == nil {
+		t.Error("backup should not exist after idempotent run")
+	}
+
+	if !strings.Contains(string(out), "already installed") {
+		t.Error("second run should mention 'already installed'")
+	}
+}
+
+func TestCLI_InstallHook_Backup(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+
+	cmd := exec.Command("git", "init")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git init failed: %v\n%s", err, out)
+	}
+
+	// Create a pre-existing hook.
+	hookPath := filepath.Join(dir, ".git", "hooks", "pre-commit")
+	existingContent := "#!/bin/sh\necho 'old hook'\n"
+	if err := os.WriteFile(hookPath, []byte(existingContent), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Run install-hook.
+	cmd = exec.Command(bin, "install-hook")
+	cmd.Dir = dir
+	out, err = cmd.CombinedOutput()
+	t.Logf("install-hook with backup output:\n%s", out)
+	if err != nil {
+		t.Fatalf("install-hook failed: %v\n%s", err, out)
+	}
+
+	// Verify backup exists and contains old content.
+	backupPath := hookPath + ".backup"
+	if _, err := os.Stat(backupPath); err != nil {
+		t.Fatal("pre-commit.backup should exist")
+	}
+	backupData, _ := os.ReadFile(backupPath)
+	if string(backupData) != existingContent {
+		t.Errorf("backup content mismatch: got %q, want %q", string(backupData), existingContent)
+	}
+
+	// Verify new hook is installed.
+	data, _ := os.ReadFile(hookPath)
+	if !strings.Contains(string(data), "ailinter pre-commit quality gate") {
+		t.Error("hook should contain ailinter quality gate header")
+	}
+
+	if !strings.Contains(string(out), "backed up") {
+		t.Error("output should mention backup")
+	}
+}
+
+func TestCLI_InstallHook_NotGitRepo(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+
+	cmd := exec.Command(bin, "install-hook")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	t.Logf("install-hook outside git repo:\n%s", out)
+	if err == nil {
+		t.Fatal("install-hook should fail outside a git repository")
+	}
+	if !strings.Contains(string(out), "not a git repository") {
+		t.Errorf("error should mention 'not a git repository', got: %s", out)
 	}
 }
 

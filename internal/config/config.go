@@ -148,7 +148,7 @@ func applyAndSave(key, value string) (*Config, error) {
 	}
 
 	switch key {
-	case "access_token":
+	case "access_token": // gitleaks:allow
 		c.AccessToken = value
 	case "onprem_url":
 		c.OnPremURL = value

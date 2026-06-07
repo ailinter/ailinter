@@ -26,7 +26,7 @@ func TestSet_AllKeys(t *testing.T) {
 		key   string
 		value string
 	}{
-		{"access_token", "test-token"},
+		{"access_token", "test-token"}, // gitleaks:allow
 		{"onprem_url", "https://example.com"},
 		{"default_path", "/tmp"},
 		{"language", "python"},

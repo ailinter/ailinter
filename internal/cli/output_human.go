@@ -182,10 +182,6 @@ func maybePlural(n int) string {
 
 // --- retained for test compatibility ---
 
-var severityOrder = map[string]int{"critical": 0, "alert": 1, "warning": 2}
-
-const boxH = "─"
-
 func cardWidthNow() int                           { return 100 }
 func cardTop(path string)                         { fmt.Printf("╭ %s ╮\n", path) }
 func cardDivider()                                { fmt.Println("├──┤") }

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ailinter/ailinter/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -22,12 +23,18 @@ func captureMainOutput(fn func()) string {
 	return buf.String()
 }
 
-func TestVersionVariable(t *testing.T) {
-	if version == "" {
-		t.Error("version should not be empty")
+func TestVersionPackage(t *testing.T) {
+	if version.Version == "" {
+		t.Error("version.Version should not be empty")
 	}
-	if !strings.Contains(version, "dev") && !strings.Contains(version, ".") {
-		t.Error("version should contain dev or semver")
+	if !strings.Contains(version.Version, "dev") && !strings.Contains(version.Version, ".") {
+		t.Error("version.Version should contain dev or semver")
+	}
+	if version.Semver() == "" {
+		t.Error("Semver() should not be empty")
+	}
+	if version.String() == "" {
+		t.Error("String() should not be empty")
 	}
 }
 
@@ -76,7 +83,7 @@ func TestRootCommand_Help(t *testing.T) {
 
 func TestRootCommand_Version(t *testing.T) {
 	root := &cobra.Command{
-		Version: version,
+		Version: version.Version,
 	}
 	root.SetArgs([]string{"--version"})
 
@@ -84,7 +91,7 @@ func TestRootCommand_Version(t *testing.T) {
 		root.Execute()
 	})
 
-	if !strings.Contains(out, version) {
-		t.Logf("version output: %s", out)
+	if !strings.Contains(out, version.Version) {
+		t.Errorf("version output should contain %q, got: %s", version.Version, out)
 	}
 }

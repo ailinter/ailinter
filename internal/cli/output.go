@@ -22,6 +22,7 @@ const (
 	FormatJSON
 	FormatMarkdown
 	FormatProblems
+	FormatSARIF
 )
 
 func (f FormatMode) String() string {
@@ -34,6 +35,8 @@ func (f FormatMode) String() string {
 		return "markdown"
 	case FormatProblems:
 		return "problems"
+	case FormatSARIF:
+		return "sarif"
 	default:
 		return "auto"
 	}
@@ -48,6 +51,7 @@ var formatNames = map[string]FormatMode{
 	"problems": FormatProblems,
 	"gcc":      FormatProblems,
 	"vscode":   FormatProblems,
+	"sarif":    FormatSARIF,
 	"auto":     FormatAuto,
 }
 
@@ -99,7 +103,7 @@ func ResolveFormatStrict(flagValue string) (FormatMode, error) {
 		}
 		return mode, nil
 	}
-	return FormatAuto, fmt.Errorf("unknown format: %s (valid: auto, human, json, markdown, problems)", flagValue)
+	return FormatAuto, fmt.Errorf("unknown format: %s (valid: auto, human, json, markdown, problems, sarif)", flagValue)
 }
 
 func IsColorEnabled() bool {
@@ -131,6 +135,8 @@ func writeResult(format FormatMode, result analyzer.QualityResult) {
 		writeMarkdownResult(result)
 	case FormatProblems:
 		writeProblemsResult(result)
+	case FormatSARIF:
+		// SARIF is handled at the top-level checkFile/checkDirectory
 	default:
 		writeHumanResult(result)
 	}
@@ -151,6 +157,8 @@ func writeResults(format FormatMode, results []analyzer.QualityResult) {
 		for _, r := range results {
 			writeProblemsResult(r)
 		}
+	case FormatSARIF:
+		// SARIF is handled at the top-level checkFile/checkDirectory
 	default:
 		for _, r := range results {
 			writeHumanResult(r)
@@ -168,6 +176,8 @@ func writeSecrets(format FormatMode, path string, findings []secrets.SecretFindi
 		writeMarkdownSecrets(path, findings)
 	case FormatProblems:
 		writeProblemsSecrets(path, findings)
+	case FormatSARIF:
+		// SARIF is handled at the top-level checkFile/checkDirectory
 	default:
 		writeHumanSecrets(path, findings)
 	}
@@ -183,6 +193,8 @@ func writeVulnerabilities(format FormatMode, path string, findings []vulnerabili
 		writeMarkdownVulnerabilities(path, findings)
 	case FormatProblems:
 		writeProblemsVulnerabilities(path, findings)
+	case FormatSARIF:
+		// SARIF is handled at the top-level checkFile/checkDirectory
 	default:
 		writeHumanVulnerabilities(path, findings)
 	}
@@ -190,7 +202,7 @@ func writeVulnerabilities(format FormatMode, path string, findings []vulnerabili
 
 func writeSummary(format FormatMode, results []analyzer.QualityResult) {
 	switch format {
-	case FormatJSON, FormatProblems:
+	case FormatJSON, FormatProblems, FormatSARIF:
 	case FormatMarkdown:
 		writeMarkdownSummary(results)
 	default:
@@ -260,8 +272,8 @@ type combinedDirResult struct {
 	CodeQuality       []analyzer.QualityResult `json:"code_quality"`
 	SecretScan        []secrets.SecretFinding  `json:"secret_scan,omitempty"`
 	VulnerabilityScan []vulnerability.Finding  `json:"vulnerability_scan,omitempty"`
-	MetaLint          []metalinter.Finding     `json:"meta_lint,omitempty"`
-}
+	MetaLint          []metalinter.Finding     `json:"meta_lint,omitempty"` // gitleaks:allow
+} // gitleaks:allow
 
 func writeCombinedJSON(result analyzer.QualityResult, data []byte, path string, noSecrets bool, noVulnerabilities bool) {
 	output := combinedResult{CodeQuality: result}
@@ -277,8 +289,8 @@ func writeCombinedJSON(result analyzer.QualityResult, data []byte, path string, 
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	enc.Encode(output)
-}
+	enc.Encode(output) // gitleaks:allow
+} // gitleaks:allow
 
 func writeCombinedDirJSON(results []analyzer.QualityResult, secretsFindings []secrets.SecretFinding, vulnFindings []vulnerability.Finding) {
 	output := combinedDirResult{
@@ -315,6 +327,8 @@ func writeMetaLintFindings(format FormatMode, findings []metalinter.Finding) {
 		for _, f := range findings {
 			fmt.Println(f.ProblemsFormat())
 		}
+	case FormatSARIF:
+		// SARIF is handled at the top-level checkFile/checkDirectory
 	default:
 		writeHumanMetaLint(findings)
 	}

@@ -1,5 +1,7 @@
 package cli
 
+import "github.com/ailinter/ailinter/internal/parser"
+
 const opencodeAgentConfig = `---
 model: deepseek/deepseek-v4-flash
 mode: subagent
@@ -25,7 +27,7 @@ You are the ailinter code scanner. Your job is to run security and quality scans
 - Return the result and stop — do not attempt to fix issues
 `
 
-const opencodeSkill = `---
+var opencodeSkill = `---
 name: ailinter
 description: Use when analyzing source code files for quality issues, scanning for hardcoded secrets, checking if a file is safe for AI modification, getting refactoring strategies, listing Git hotspots, or managing ailinter configuration. Trigger keywords: ailinter, analyze, lint, code quality, refactor, secrets, assess, hotspots, code health.
 ---
@@ -40,12 +42,7 @@ ailinter is a local MCP server that gives AI coding assistants visibility into c
 
 Call ` + "`analyze_code(file_path)`" + ` on any file BEFORE writing changes, and again AFTER changes are applied. It returns a quality score (0-100) with tier classification:
 
-| Score | Tier | Guidance |
-|-------|------|----------|
-| 95-100 | Go Ahead | Safe to modify freely |
-| 70-94 | Proceed with Care | Use guard clauses, small changes, re-check after each edit |
-| 10-69 | Stop & Refactor | **Refactor first** — call ` + "`get_refactoring_strategy()`" + ` for detected issues |
-
+` + "\n" + parser.TierReferenceTable() + "\n" + `
 **Rule:** Always run ` + "`analyze_code`" + ` before committing. If score dropped, fix the regression.
 
 ### 2. scan_for_secrets(content) — On All Generated Code
@@ -125,7 +122,7 @@ const claudeMCPConfig = `{
 }
 `
 
-const claudeInstructions = `# CLAUDE.md
+var claudeInstructions = `# CLAUDE.md
 
 ## Code Quality with ailinter
 
@@ -133,9 +130,10 @@ This project uses ailinter for code quality and security scanning. When making c
 
 ### Before and After Every Edit
 - Run the ailinter ` + "`analyze_code`" + ` tool on the file BEFORE and AFTER changes
-- Code Quality Score 95-100 → safe to modify freely
-- Score 75-94 → use guard clauses, small changes, re-check
-- Score <75 → **refactor FIRST** — call ` + "`get_refactoring_strategy`" + ` before adding features
+- **Score 80-100 (Go Ahead)**: Safe to modify freely
+- **Score 60-79 (Proceed with Care)**: Use guard clauses, small changes, re-check
+- **Score 40-59 (Needs Work)**: Significant issues — refactor incrementally in small steps
+- **Score <40 (Stop & Refactor)**: **Refactor FIRST** — call ` + "`get_refactoring_strategy`" + ` before adding features
 
 ### The Refactoring Loop (Mandatory When Score < 80)
 1. Call ` + "`analyze_code(file)`" + ` — know your baseline score and smells
@@ -164,12 +162,7 @@ ailinter check --format problems <path>  # Machine-parseable output
 
 ## Quality Score Reference
 
-| Score | Label | AI Guidance |
-|-------|-------|-------------|
-| 95-100 | Go Ahead | Safe for AI modification |
-| 75-94 | Proceed with Care | Use guard clauses, small changes, re-check |
-| 0-74 | Stop & Refactor | Refactor BEFORE AI modification |
-
+` + "\n" + parser.TierReferenceTable() + "\n" + `
 ## Available MCP Tools
 
 | Tool | Purpose |
@@ -181,7 +174,7 @@ ailinter check --format problems <path>  # Machine-parseable output
 | list_hotspots | Frequently-changed files with low quality scores |
 `
 
-const cursorRules = `---
+var cursorRules = `---
 description: ailinter — Code Quality & Security
 globs: **/*.go,**/*.py,**/*.js,**/*.ts,**/*.tsx,**/*.java,**/*.rs,**/*.rb,**/*.c,**/*.cpp,**/*.h,**/*.hpp,**/*.cs,**/*.swift,**/*.kt,**/*.kts,**/*.php,**/*.sh,**/*.bash,**/*.tf,**/*.yaml,**/*.yml,**/*.toml,**/*.xml,**/*.html,**/*.css,**/*.sql
 alwaysApply: true
@@ -191,9 +184,10 @@ alwaysApply: true
 
 ## Before Every Edit
 - Call the ailinter ` + "`analyze_code`" + ` tool on the file
-- Score 95-100 (Go Ahead) → safe to modify
-- Score 75-94 (Proceed with Care) → use guard clauses, re-check after
-- Score <75 (Stop & Refactor) → **MUST refactor first** — call ` + "`get_refactoring_strategy`" + ` before touching code
+- **Score 80-100 (Go Ahead)**: Safe to modify
+- **Score 60-79 (Proceed with Care)**: Use guard clauses, re-check after
+- **Score 40-59 (Needs Work)**: Significant issues — refactor incrementally
+- **Score <40 (Stop & Refactor)**: **MUST refactor first** — call ` + "`get_refactoring_strategy`" + ` before touching code
 
 ## The Refactoring Loop (Critical Path)
 When ` + "`analyze_code`" + ` finds issues:
@@ -229,13 +223,14 @@ const cursorMCPConfig = `{
 }
 `
 
-const copilotInstructions = `# ailinter Code Quality & Security
+var copilotInstructions = `# ailinter Code Quality & Security
 
 ## Before Every Code Change
 - Run the ailinter ` + "`analyze_code`" + ` tool on the file before editing
-- **Score 95-100 (Go Ahead)**: Safe to modify
-- **Score 75-94 (Proceed with Care)**: Make small, focused changes; re-check after each
-- **Score <75 (Stop & Refactor)**: **MUST refactor first** — call ` + "`get_refactoring_strategy`" + ` before adding features
+- **Score 80-100 (Go Ahead)**: Safe to modify
+- **Score 60-79 (Proceed with Care)**: Make small, focused changes; re-check after each
+- **Score 40-59 (Needs Work)**: Significant issues — refactor incrementally in small steps
+- **Score <40 (Stop & Refactor)**: **MUST refactor first** — call ` + "`get_refactoring_strategy`" + ` before adding features
 
 ## The Refactoring Loop (Mandatory)
 When ` + "`analyze_code`" + ` scores < 80:
@@ -306,9 +301,6 @@ fi
 
 echo "ailinter: all clear."
 exit 0
-`
-
-const gitignorePreCommit = `# ailinter hook placeholder
 `
 
 const strictConfig = `# ailinter configuration (strict thresholds)

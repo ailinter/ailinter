@@ -1,5 +1,10 @@
 package parser
 
+import (
+	"fmt"
+	"strings"
+)
+
 // Smell represents a detected code smell.
 type Smell struct {
 	Name      string `json:"name"`     // e.g. "deep_nesting", "brain_method", "bumpy_road"
@@ -66,6 +71,70 @@ const (
 	LabelStopRefactor    = "Stop & Refactor"
 )
 
+// Score tier thresholds — single source of truth for the classify() function.
+// Templates reference these so they auto-update when tiers change.
+const (
+	GoAheadThreshold         = 80
+	ProceedWithCareThreshold = 60
+	NeedsWorkThreshold       = 40
+)
+
+// ScoreTier describes one score tier for documentation and templates.
+type ScoreTier struct {
+	MinScore int
+	MaxScore int
+	Label    string
+	Guidance string
+}
+
+// ScoreTiers returns all quality score tiers in descending order.
+// Templates call this to generate reference tables that always
+// match the actual classify() function.
+func ScoreTiers() []ScoreTier {
+	return []ScoreTier{
+		{
+			MinScore: GoAheadThreshold,
+			MaxScore: 100,
+			Label:    LabelGoAhead,
+			Guidance: "Safe for AI modification",
+		},
+		{
+			MinScore: ProceedWithCareThreshold,
+			MaxScore: GoAheadThreshold - 1,
+			Label:    LabelProceedWithCare,
+			Guidance: "Use guard clauses, prefer small changes, re-check after each edit",
+		},
+		{
+			MinScore: NeedsWorkThreshold,
+			MaxScore: ProceedWithCareThreshold - 1,
+			Label:    LabelNeedsWork,
+			Guidance: "Significant issues — refactor incrementally in small steps",
+		},
+		{
+			MinScore: 0,
+			MaxScore: NeedsWorkThreshold - 1,
+			Label:    LabelStopRefactor,
+			Guidance: "Refactor BEFORE AI modification. Run get_refactoring_strategy() for detected issues.",
+		},
+	}
+}
+
+// TierReferenceTable returns a markdown table of score tiers for
+// inclusion in AGENTS.md and agent configuration templates.
+func TierReferenceTable() string {
+	var b strings.Builder
+	b.WriteString("| Score | Label | AI Guidance |\n")
+	b.WriteString("|-------|-------|-------------|\n")
+	for _, t := range ScoreTiers() {
+		rangeStr := fmt.Sprintf("%d-%d", t.MinScore, t.MaxScore)
+		if t.MinScore == 0 {
+			rangeStr = fmt.Sprintf("<%d", t.MaxScore+1)
+		}
+		b.WriteString(fmt.Sprintf("| %s | %s | %s |\n", rangeStr, t.Label, t.Guidance))
+	}
+	return b.String()
+}
+
 // Tiers for vulnerability severity classification.
 const (
 	VulnLabelClean     = "Clean"
@@ -75,11 +144,11 @@ const (
 
 func classify(score int) string {
 	switch {
-	case score >= 80:
+	case score >= GoAheadThreshold:
 		return LabelGoAhead
-	case score >= 60:
+	case score >= ProceedWithCareThreshold:
 		return LabelProceedWithCare
-	case score >= 40:
+	case score >= NeedsWorkThreshold:
 		return LabelNeedsWork
 	default:
 		return LabelStopRefactor
@@ -107,20 +176,7 @@ func VulnClassify(findings []struct {
 		return VulnLabelMonitor
 	}
 	return VulnLabelClean
-}
 
-// severityWeight maps severity strings to penalty weights.
-func severityWeight(severity string) float64 {
-	switch severity {
-	case "warning":
-		return 0.5
-	case "alert":
-		return 1.0
-	case "critical":
-		return 2.0
-	default:
-		return 0.5
-	}
 }
 
 // TestClassifyHelper is exported for testing the classify function.

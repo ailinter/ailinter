@@ -13,7 +13,7 @@ import (
 
 func TestGetEnvOrDefault(t *testing.T) {
 	t.Run("env var set", func(t *testing.T) {
-		t.Setenv("AILINTER_TEST_KEY", "custom_value")
+		t.Setenv("AILINTER_TEST_KEY", "custom_value") // gitleaks:allow
 		got := getEnvOrDefault("AILINTER_TEST_KEY", "fallback")
 		if got != "custom_value" {
 			t.Errorf("expected custom_value, got %q", got)
@@ -21,7 +21,7 @@ func TestGetEnvOrDefault(t *testing.T) {
 	})
 
 	t.Run("env var empty", func(t *testing.T) {
-		os.Unsetenv("AILINTER_TEST_KEY_EMPTY")
+		os.Unsetenv("AILINTER_TEST_KEY_EMPTY") // gitleaks:allow
 		got := getEnvOrDefault("AILINTER_TEST_KEY_EMPTY", "default_fallback")
 		if got != "default_fallback" {
 			t.Errorf("expected default_fallback, got %q", got)
@@ -29,7 +29,7 @@ func TestGetEnvOrDefault(t *testing.T) {
 	})
 
 	t.Run("env var empty string", func(t *testing.T) {
-		t.Setenv("AILINTER_TEST_KEY_EMPTYSTR", "")
+		t.Setenv("AILINTER_TEST_KEY_EMPTYSTR", "") // gitleaks:allow
 		got := getEnvOrDefault("AILINTER_TEST_KEY_EMPTYSTR", "empty_fallback")
 		if got != "empty_fallback" {
 			t.Errorf("expected empty_fallback, got %q", got)

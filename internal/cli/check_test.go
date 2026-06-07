@@ -14,7 +14,7 @@ func TestScanAndWriteSecrets(t *testing.T) {
 	t.Run("with secret data and Problems format", func(t *testing.T) {
 		dir := t.TempDir()
 		f := filepath.Join(dir, "keys.go")
-		content := []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n")
+		content := []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n") // gitleaks:allow
 		os.WriteFile(f, content, 0644)
 
 		out := captureStdout(func() {
@@ -42,7 +42,7 @@ func TestScanAndWriteSecrets(t *testing.T) {
 	t.Run("with secret data and JSON format", func(t *testing.T) {
 		dir := t.TempDir()
 		f := filepath.Join(dir, "keys.go")
-		content := []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n")
+		content := []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n") // gitleaks:allow
 		os.WriteFile(f, content, 0644)
 
 		out := captureStdout(func() {
@@ -143,7 +143,7 @@ func TestWriteDirTokenEstimates(t *testing.T) {
 func TestCheckFile_SecretsOnly(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "keys.go")
-	os.WriteFile(f, []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644)
+	os.WriteFile(f, []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644) // gitleaks:allow
 
 	opts := checkOptions{
 		format:      FormatProblems,
@@ -162,7 +162,7 @@ func TestCheckFile_SecretsOnly(t *testing.T) {
 func TestCheckFile_SecretsOnlyJSON(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "keys.go")
-	os.WriteFile(f, []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644)
+	os.WriteFile(f, []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644) // gitleaks:allow
 
 	opts := checkOptions{
 		format:      FormatJSON,

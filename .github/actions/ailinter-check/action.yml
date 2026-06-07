@@ -1,0 +1,267 @@
+# AILINTER Code Quality Check — Composite GitHub Action
+#
+# Installs the AILINTER binary, runs code quality analysis and secret
+# scanning, then surfaces the results as step outputs. Works on Linux
+# and macOS runners (x86_64 and arm64).
+#
+# Usage:
+#   jobs:
+#     quality:
+#       runs-on: ubuntu-latest
+#       steps:
+#         - uses: actions/checkout@v4
+#         - uses: ailinter/ailinter/.github/actions/ailinter-check@main
+#           with:
+#             quality-threshold: 90
+#             fail-on-secrets: true
+
+name: 'AILINTER Code Quality Check'
+description: >
+  Run AILINTER code quality analysis and secret scanning on a repository.
+  Installs the binary from GitHub Releases, scans the given path, and
+  returns quality-score, secrets-found, and issues-found as outputs.
+
+inputs:
+  fail-on-secrets:
+    description: 'Fail the workflow if secrets are detected'
+    required: false
+    default: 'true'
+  quality-threshold:
+    description: 'Minimum quality score (0-100). The action fails when the lowest per-file score is below this value.'
+    required: false
+    default: '90'
+  version:
+    description: >
+      AILINTER release tag to use, e.g. "v0.8.8". Use "latest" to
+      automatically resolve the most recent GitHub release.
+    required: false
+    default: 'latest'
+  scan-path:
+    description: 'File, directory, or glob pattern to scan. Defaults to the repository root.'
+    required: false
+    default: '.'
+
+outputs:
+  quality-score:
+    description: 'Lowest per-file quality score (0-100)'
+    value: ${{ steps.extract-results.outputs.quality-score }}
+  secrets-found:
+    description: 'Number of secrets detected'
+    value: ${{ steps.extract-results.outputs.secrets-found }}
+  issues-found:
+    description: 'Number of code quality issues (errors + warnings)'
+    value: ${{ steps.extract-results.outputs.issues-found }}
+
+runs:
+  using: 'composite'
+  steps:
+    # ------------------------------------------------------------------
+    # 1. Install AILINTER binary from GitHub Releases
+    # ------------------------------------------------------------------
+    - name: Install AILINTER
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # ---- resolve version ----
+        VERSION="${{ inputs.version }}"
+        if [ "$VERSION" = "latest" ]; then
+          echo "⚡ Resolving latest AILINTER release…"
+          API_RESP=$(curl -sSL --retry 3 \
+            https://api.github.com/repos/ailinter/ailinter/releases/latest)
+          VERSION=$(printf '%s' "$API_RESP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))")
+          if [ -z "$VERSION" ]; then
+            echo "❌ Failed to resolve latest version from GitHub API"
+            echo "Response preview:"
+            printf '%s' "$API_RESP" | head -5
+            exit 1
+          fi
+          echo "  → Latest: $VERSION"
+        else
+          echo "  → Pinned:  $VERSION"
+        fi
+        echo "version=$VERSION" >> "$GITHUB_ENV"
+
+        # ---- detect platform ----
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64|amd64)  ARCH="amd64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
+          *)
+            echo "❌ Unsupported architecture: $ARCH (amd64 / arm64 only)"
+            exit 1
+            ;;
+        esac
+        echo "  → Platform: ${OS}/${ARCH}"
+
+        # ---- download binary ----
+        ASSET="ailinter_${VERSION}_${OS}_${ARCH}"
+        DOWNLOAD_URL="https://github.com/ailinter/ailinter/releases/download/${VERSION}/${ASSET}"
+
+        echo "  → Downloading: ${DOWNLOAD_URL}"
+        curl -sSL --retry 3 --fail "$DOWNLOAD_URL" -o /usr/local/bin/ailinter || {
+          echo "⚠️  Primary URL failed; trying with stripped version prefix…"
+          STRIPPED="${VERSION#v}"
+          FALLBACK_URL="https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_v${STRIPPED}_${OS}_${ARCH}"
+          echo "  → Fallback: ${FALLBACK_URL}"
+          curl -sSL --retry 3 --fail "$FALLBACK_URL" -o /usr/local/bin/ailinter || {
+            echo "❌ Download failed for both URLs."
+            echo "   Check that release ${VERSION} exists and supports ${OS}/${ARCH}."
+            exit 1
+          }
+        }
+        chmod +x /usr/local/bin/ailinter
+
+        # ---- verify ----
+        INSTALLED=$(ailinter --version 2>&1)
+        echo "✅ Installed: ${INSTALLED}"
+
+    # ------------------------------------------------------------------
+    # 2. Run code quality analysis (skip secrets / vulnerabilities)
+    # ------------------------------------------------------------------
+    - name: Run AILINTER Code Quality Check
+      id: quality-check
+      shell: bash
+      continue-on-error: true
+      run: |
+        echo "::group::🔍 AILINTER Code Quality Check"
+        echo "Scanning: ${{ inputs.scan-path }}"
+        echo ""
+
+        ailinter check "${{ inputs.scan-path }}" \
+          --format problems \
+          --no-secrets \
+          --no-vulnerabilities \
+          2>&1 | tee /tmp/ailinter-quality.txt
+
+        echo "::endgroup::"
+        echo "exitcode=$?" >> "$GITHUB_OUTPUT"
+
+    # ------------------------------------------------------------------
+    # 3. Run secret scan
+    # ------------------------------------------------------------------
+    - name: Run AILINTER Secret Scan
+      id: secrets-check
+      shell: bash
+      continue-on-error: true
+      run: |
+        echo "::group::🔒 AILINTER Secret Scan"
+        echo "Scanning: ${{ inputs.scan-path }}"
+        echo ""
+
+        ailinter check "${{ inputs.scan-path }}" \
+          --secrets-only \
+          --format problems \
+          2>&1 | tee /tmp/ailinter-secrets.txt
+
+        echo "::endgroup::"
+        echo "exitcode=$?" >> "$GITHUB_OUTPUT"
+
+    # ------------------------------------------------------------------
+    # 4. Parse results and set action outputs
+    # ------------------------------------------------------------------
+    - name: Extract Results
+      id: extract-results
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        LOWEST=100
+        ISSUES=0
+        SECRETS=0
+
+        # ---- quality score: parse per-file header lines ----
+        # Lines look like:
+        #   # /path/to/file.go score=98 label=Go Ahead lines=68 lang=go
+        if [ -f /tmp/ailinter-quality.txt ]; then
+          while IFS= read -r line; do
+            if [[ "$line" =~ score=([0-9]+) ]]; then
+              score="${BASH_REMATCH[1]}"
+              [ "$score" -lt "$LOWEST" ] && LOWEST="$score"
+            fi
+          done < /tmp/ailinter-quality.txt
+
+          # Count findings (lines with file:line:col: pattern)
+          ISSUES=$(grep -cE '^[^#]+\.[a-z]+:[0-9]+:[0-9]+:' \
+            /tmp/ailinter-quality.txt 2>/dev/null || echo 0)
+        fi
+
+        # ---- secrets count ----
+        if [ -f /tmp/ailinter-secrets.txt ]; then
+          SECRETS=$(grep -cE '^[^#]+\.[a-z]+:[0-9]+:[0-9]+:' \
+            /tmp/ailinter-secrets.txt 2>/dev/null || echo 0)
+        fi
+
+        echo "quality-score=$LOWEST"    >> "$GITHUB_OUTPUT"
+        echo "issues-found=$ISSUES"     >> "$GITHUB_OUTPUT"
+        echo "secrets-found=$SECRETS"   >> "$GITHUB_OUTPUT"
+
+        # Print summary to workflow log
+        echo ""
+        echo "╔══════════════════════════════════════════╗"
+        echo "║      AILINTER — Results Summary          ║"
+        echo "╠══════════════════════════════════════════╣"
+        printf "║  %-38s ║\n" "Lowest quality score : ${LOWEST}/100"
+        printf "║  %-38s ║\n" "Quality threshold   : ${{ inputs.quality-threshold }}/100"
+        printf "║  %-38s ║\n" "Code quality issues : ${ISSUES}"
+        printf "║  %-38s ║\n" "Secrets detected    : ${SECRETS}"
+        echo "╚══════════════════════════════════════════╝"
+
+    # ------------------------------------------------------------------
+    # 5. Generate markdown summary for later use (PR comment, etc.)
+    # ------------------------------------------------------------------
+    - name: Generate Summary
+      id: generate-summary
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        LOWEST="${{ steps.extract-results.outputs.quality-score }}"
+        THRESHOLD="${{ inputs.quality-threshold }}"
+        SECRETS="${{ steps.extract-results.outputs.secrets-found }}"
+        FAIL_ON_SECRETS="${{ inputs.fail-on-secrets }}"
+        ISSUES="${{ steps.extract-results.outputs.issues-found }}"
+
+        SUMMARY="/tmp/ailinter-summary.md"
+
+        cat > "$SUMMARY" <<-SUMMARYEOF
+        ## 🔍 AILINTER Code Quality Report
+
+        | Metric | Value |
+        |--------|-------|
+        | **Lowest Quality Score** | ${LOWEST} / 100 |
+        | **Score Threshold** | ${THRESHOLD} / 100 |
+        | **Code Quality Issues** | ${ISSUES} |
+        | **Secrets Found** | ${SECRETS} |
+
+        SUMMARYEOF
+
+        FAIL=0
+        if [ "$SECRETS" -gt 0 ] && [ "$FAIL_ON_SECRETS" = "true" ]; then
+          echo "❌ **Secret scan failed** — ${SECRETS} secret(s) detected and \`fail-on-secrets\` is enabled." >> "$SUMMARY"
+          FAIL=1
+        fi
+        if [ "$LOWEST" -lt "$THRESHOLD" ]; then
+          echo "❌ **Quality threshold not met** — lowest score (${LOWEST}) is below the required ${THRESHOLD}." >> "$SUMMARY"
+          FAIL=1
+        fi
+        if [ "$FAIL" -eq 0 ]; then
+          echo "✅ **All AILINTER checks passed!**" >> "$SUMMARY"
+        fi
+
+        cat "$SUMMARY"
+
+        echo "check-failed=$FAIL" >> "$GITHUB_OUTPUT"
+
+    # ------------------------------------------------------------------
+    # 6. Fail if thresholds are breached
+    # ------------------------------------------------------------------
+    - name: Fail on Threshold Breach
+      if: steps.generate-summary.outputs.check-failed == 'true'
+      shell: bash
+      run: |
+        echo "::error::AILINTER checks failed. See summary above for details."
+        echo ""
+        echo "To view details: cat /tmp/ailinter-quality.txt"
+        exit 1

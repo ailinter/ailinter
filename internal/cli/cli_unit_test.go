@@ -28,6 +28,30 @@ func TestInitCommand_Exists(t *testing.T) {
 	}
 }
 
+func TestInstallHookCommand_Exists(t *testing.T) {
+	cmd := InstallHookCommand()
+	if cmd == nil {
+		t.Fatal("InstallHookCommand returned nil")
+	}
+	if cmd.Use != "install-hook" {
+		t.Errorf("Use = %q, want install-hook", cmd.Use)
+	}
+	if cmd.Short == "" {
+		t.Error("Short description should not be empty")
+	}
+}
+
+func TestInstallHookCommand_ForceFlag(t *testing.T) {
+	cmd := InstallHookCommand()
+	flag := cmd.Flags().Lookup("force")
+	if flag == nil {
+		t.Fatal("--force flag should exist")
+	}
+	if flag.DefValue != "false" {
+		t.Errorf("--force default should be false, got %q", flag.DefValue)
+	}
+}
+
 func TestInitCommand_CreatesFiles(t *testing.T) {
 	dir := t.TempDir()
 	os.Chdir(dir)
@@ -122,7 +146,7 @@ func TestCheckCommand_HasNoVulnerabilitiesFlag(t *testing.T) {
 
 func TestCheckCommand_HasAllFlags(t *testing.T) {
 	cmd := CheckCommand()
-	expected := []string{"format", "no-secrets", "no-vulnerabilities", "secrets-only", "vulnerabilities-only", "lang", "no-gitignore"}
+	expected := []string{"format", "no-secrets", "no-vulnerabilities", "secrets-only", "vulnerabilities-only", "lang", "no-gitignore"} // gitleaks:allow
 	for _, name := range expected {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("flag --%s not found", name)
