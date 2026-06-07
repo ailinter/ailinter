@@ -573,7 +573,7 @@ func (ctx *walkContext) walkFn(path string, d os.DirEntry, err error) error {
 	}
 	if d.IsDir() {
 		base := filepath.Base(path)
-		if strings.HasPrefix(base, ".") || base == "node_modules" || base == "vendor" {
+		if strings.HasPrefix(base, ".") || base == "node_modules" || base == "vendor" || base == "testdata" {
 			return filepath.SkipDir
 		}
 		return nil
