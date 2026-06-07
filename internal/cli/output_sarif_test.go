@@ -166,6 +166,154 @@ func TestWriteSARIFCombined_EmptyResults(t *testing.T) {
 	}
 }
 
+func TestSeverityToScore(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		severity string
+		label    string // expected GitHub label bucket
+		min      float64
+		max      float64
+	}{
+		{"critical", "Critical", 9.0, 10.0},
+		{"error", "High", 7.0, 8.9},
+		{"alert", "Medium", 4.0, 6.9},
+		{"warning", "Medium", 4.0, 6.9},
+		{"info", "Low", 0.1, 3.9},
+		{"note", "Low", 0.1, 3.9},
+		{"unknown", "Low", 0.1, 3.9},
+		{"", "Low", 0.1, 3.9},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.severity, func(t *testing.T) {
+			got := severityToScore(tt.severity)
+			if got < tt.min || got > tt.max {
+				t.Errorf("severityToScore(%q) = %.1f, want in [%.1f, %.1f] (GitHub: %s)",
+					tt.severity, got, tt.min, tt.max, tt.label)
+			}
+		})
+	}
+}
+
+func TestSARIFRuleStableDescriptions(t *testing.T) {
+	t.Parallel()
+
+	// Known rule IDs that should have stable descriptions from the curated map.
+	knownRuleIDs := []string{
+		"deep_nesting",
+		"brain_method",
+		"bumpy_road",
+		"complex_conditional",
+		"generic-api-key",
+		"aws-access-key",
+		"go_sql_injection",
+		"go_path_traversal",
+		"spelling",
+		"gofmt",
+		"staticcheck",
+	}
+
+	for _, ruleID := range knownRuleIDs {
+		t.Run(ruleID, func(t *testing.T) {
+			name := ruleName(ruleID)
+			if name == "" {
+				t.Errorf("ruleName(%q) returned empty string", ruleID)
+			}
+			if name == ruleID {
+				t.Errorf("ruleName(%q) = %q, expected a human-readable description, not the raw ID", ruleID, name)
+			}
+			// Verify the description is stable: calling twice gives the same result
+			name2 := ruleName(ruleID)
+			if name != name2 {
+				t.Errorf("ruleName(%q) is not stable: first call = %q, second call = %q", ruleID, name, name2)
+			}
+		})
+	}
+}
+
+func TestSARIFRuleFallbackName(t *testing.T) {
+	t.Parallel()
+
+	// Unknown rule IDs should fall back to Title Case conversion.
+	tests := []struct {
+		ruleID string
+		want   string
+	}{
+		{"my_custom_rule", "My Custom Rule"},
+		{"single", "Single"},
+		{"already-title", "Already-title"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.ruleID, func(t *testing.T) {
+			got := ruleName(tt.ruleID)
+			if got != tt.want {
+				t.Errorf("ruleName(%q) = %q, want %q", tt.ruleID, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSARIFRulesHaveSecuritySeverity(t *testing.T) {
+	t.Parallel()
+
+	results := []analyzer.QualityResult{
+		{
+			Score:    65,
+			FilePath: "src/main.go",
+			Smells: []analyzer.Smell{
+				{Name: "deep_nesting", Severity: "warning", LineStart: 10, Message: "Nesting depth 5"},
+				{Name: "brain_method", Severity: "alert", LineStart: 20, Message: "Function too long (120 lines)"},
+				{Name: "bumpy_road", Severity: "critical", LineStart: 30, Message: "Bumpy road detected"},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := WriteSARIFCombined(&buf, results, nil, nil, nil, "")
+	if err != nil {
+		t.Fatalf("WriteSARIFCombined returned error: %v", err)
+	}
+
+	var log SARIFLog
+	if err := json.Unmarshal(buf.Bytes(), &log); err != nil {
+		t.Fatalf("SARIF output must be valid JSON: %v", err)
+	}
+
+	run := log.Runs[0]
+	if len(run.Tool.Driver.Rules) == 0 {
+		t.Fatal("expected at least one rule")
+	}
+
+	for _, rule := range run.Tool.Driver.Rules {
+		t.Run(rule.ID, func(t *testing.T) {
+			// Every rule must have a security-severity or the GitHub taxonomy won't work
+			if rule.Properties.SecuritySeverity == 0 {
+				t.Errorf("rule %q has security-severity = 0, expected non-zero", rule.ID)
+			}
+			// Must be in valid range
+			if rule.Properties.SecuritySeverity < 0.0 || rule.Properties.SecuritySeverity > 10.0 {
+				t.Errorf("rule %q has security-severity = %.1f, outside valid range [0.0, 10.0]",
+					rule.ID, rule.Properties.SecuritySeverity)
+			}
+			// Must have a stable name (not the raw ruleID)
+			if rule.Name == rule.ID {
+				t.Errorf("rule %q has Name = %q, expected a human-readable name", rule.ID, rule.Name)
+			}
+			// Must have stable short description
+			if rule.ShortDescription.Text == "" {
+				t.Errorf("rule %q has empty shortDescription", rule.ID)
+			}
+			// Category should be set
+			if rule.Properties.Category == "" {
+				t.Errorf("rule %q has empty category", rule.ID)
+			}
+		})
+	}
+}
+
 func TestMapSeverityToSARIF(t *testing.T) {
 	t.Parallel()
 

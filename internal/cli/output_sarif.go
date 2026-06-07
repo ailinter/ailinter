@@ -55,7 +55,8 @@ type SARIFRule struct {
 
 // SARIFProperties holds optional metadata on a rule.
 type SARIFProperties struct {
-	Category string `json:"category,omitempty"`
+	Category         string  `json:"category,omitempty"`
+	SecuritySeverity float64 `json:"security-severity,omitempty"`
 }
 
 // SARIFResult is a single finding in a SARIF run.
@@ -296,7 +297,18 @@ func encodeSARIF(w io.Writer, log SARIFLog) error {
 
 // buildSARIFRules extracts a de-duplicated list of rules from entries.
 // Returns the rules slice and a map of ruleID → ruleIndex.
+// Each rule includes a security-severity score (for GitHub severity taxonomy)
+// and a stable name/description from the curated ruleDescriptions map.
 func buildSARIFRules(entries []sarifEntry) ([]SARIFRule, map[string]int) {
+	// First pass: compute maximum severity score per rule across all entries.
+	ruleMaxSev := make(map[string]float64)
+	for _, e := range entries {
+		s := severityToScore(e.severity)
+		if s > ruleMaxSev[e.ruleID] {
+			ruleMaxSev[e.ruleID] = s
+		}
+	}
+
 	seen := make(map[string]bool)
 	var rules []SARIFRule
 	ruleIndex := make(map[string]int)
@@ -320,15 +332,17 @@ func buildSARIFRules(entries []sarifEntry) ([]SARIFRule, map[string]int) {
 			helpURI = "https://ailinter.dev/docs/meta-lint"
 		}
 
+		name := ruleName(e.ruleID)
 		rules = append(rules, SARIFRule{
 			ID:   e.ruleID,
-			Name: e.ruleID,
+			Name: name,
 			ShortDescription: SARIFMessage{
-				Text: e.message,
+				Text: name,
 			},
 			HelpURI: helpURI,
 			Properties: SARIFProperties{
-				Category: e.category,
+				Category:         e.category,
+				SecuritySeverity: ruleMaxSev[e.ruleID],
 			},
 		})
 	}
@@ -361,4 +375,104 @@ func mapSeverityToSARIF(severity string) string {
 	default:
 		return "note"
 	}
+}
+
+// severityToScore maps an ailinter severity string to a numeric score (0.0-10.0)
+// for GitHub's security-severity taxonomy. The score determines the severity
+// label shown in the GitHub Security tab:
+//   - 9.0+  → Critical
+//   - 7.0-8.9 → High
+//   - 4.0-6.9 → Medium
+//   - 0.1-3.9 → Low
+//   - 0.0 or unset → falls back to SARIF level
+func severityToScore(severity string) float64 {
+	switch strings.ToLower(severity) {
+	case "critical":
+		return 9.5
+	case "error":
+		return 8.0
+	case "alert":
+		return 5.0
+	case "warning":
+		return 4.0
+	default:
+		return 1.0
+	}
+}
+
+// ruleDescriptions maps known rule IDs to stable, human-readable descriptions.
+// This ensures rule names are consistent across all SARIF output instances
+// and are not dependent on the first finding's message text.
+var ruleDescriptions = map[string]string{
+	// Code Quality
+	"deep_nesting":        "Deeply nested control flow",
+	"brain_method":        "Overly large method / function",
+	"bumpy_road":          "Code with bumpy readability — many short blocks",
+	"complex_conditional": "Complex boolean condition with many branches",
+	"complex_method":      "Method with high cyclomatic complexity",
+	"long_parameter_list": "Function with too many parameters",
+	"primitive_obsession": "Excessive use of primitive types",
+	"duplicated_code":     "Duplicated code block",
+	"god_class":           "Class with too many responsibilities",
+	"file_bloat":          "File exceeds size thresholds",
+	"paragraph_of_code":   "Long block of consecutive non-blank lines",
+	"lazy_element":        "Unnecessary intermediate variable or function",
+	"message_chains":      "Long method call chain",
+	"long_scope_variable": "Variable used far from declaration",
+	"long_switch":         "Long switch statement",
+	"global_data":         "Excessive global state",
+	"excessive_comments":  "Too many comments relative to code",
+	"low_cohesion":        "Low cohesion in class/module",
+	"brain_class":         "Overly large class",
+	"code_duplication":    "Duplicate code pattern",
+
+	// Secrets
+	"generic-api-key":     "Generic API key detected",
+	"gcp-api-key":         "Google Cloud Platform API key",
+	"aws-access-key":      "AWS access key",
+	"stripe-access-token": "Stripe access token",
+
+	// Vulnerabilities
+	"go_path_traversal":          "Path traversal via filepath.Join with user input",
+	"go_sql_injection":           "SQL query built with string formatting",
+	"go_exec_shell_injection":    "Command injection via exec.Command with shell",
+	"go_template_html_xss":       "XSS via template.HTML() bypassing auto-escaping",
+	"go_ssrf_http":               "SSRF via http.Get() with user-controlled URL",
+	"eval_injection":             "eval() with untrusted input",
+	"innerHTML_xss":              "innerHTML assignment with untrusted content",
+	"aes_ecb_mode":               "AES in ECB mode (leaks plaintext structure)",
+	"weak_hash_md5":              "MD5 hash (collision vulnerability)",
+	"weak_hash_sha1":             "SHA-1 hash (collision vulnerability)",
+	"weak_crypto_des":            "DES/3DES encryption (deprecated)",
+	"tls_verification_disabled":  "TLS certificate verification disabled",
+	"xml_unsafe_parse":           "XML parsing vulnerable to XXE",
+	"unsafe_yaml_load":           "Unsafe YAML deserialization",
+	"pickle_wrapper_load":        "Unsafe pickle deserialization",
+	"python_subprocess_shell":    "subprocess with shell=True",
+	"react_dangerously_set_html": "dangerouslySetInnerHTML with untrusted content",
+	"document_write_xss":         "document.write() with untrusted input",
+	"new_function_injection":     "new Function() with dynamic string",
+
+	// Metalint
+	"spelling":    "Spelling error detected",
+	"gofmt":       "Code formatting issue",
+	"go_vet":      "Go vet issue",
+	"staticcheck": "Static analysis issue",
+}
+
+// ruleName returns a stable, human-readable name for a rule ID.
+// It first checks the curated ruleDescriptions map, then falls back
+// to converting snake_case to Title Case (e.g., "go_path_traversal" → "Go Path Traversal").
+func ruleName(ruleID string) string {
+	if desc, ok := ruleDescriptions[ruleID]; ok {
+		return desc
+	}
+	// Fallback: convert snake_case to Title Case
+	words := strings.Split(ruleID, "_")
+	for i, w := range words {
+		if len(w) > 0 {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
 }
