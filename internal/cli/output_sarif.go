@@ -2,9 +2,11 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/ailinter/ailinter/internal/analyzer"
@@ -57,8 +59,31 @@ type SARIFRule struct {
 
 // SARIFProperties holds optional metadata on a rule.
 type SARIFProperties struct {
-	Category         string  `json:"category,omitempty"`
-	SecuritySeverity float64 `json:"security-severity,omitempty"`
+	Category         string           `json:"category,omitempty"`
+	SecuritySeverity SARIFSeverityStr `json:"security-severity,omitempty"`
+}
+
+// SARIFSeverityStr is a float64 that marshals to a JSON string,
+// as required by GitHub Code Scanning's SARIF parser. The SARIF
+// spec says security-severity must be a string (e.g. "9.5"), not
+// a bare number.
+type SARIFSeverityStr float64
+
+func (s SARIFSeverityStr) MarshalJSON() ([]byte, error) {
+	return json.Marshal(fmt.Sprintf("%.1f", float64(s)))
+}
+
+func (s *SARIFSeverityStr) UnmarshalJSON(b []byte) error {
+	var str string
+	if err := json.Unmarshal(b, &str); err != nil {
+		return err
+	}
+	v, err := strconv.ParseFloat(str, 64)
+	if err != nil {
+		return err
+	}
+	*s = SARIFSeverityStr(v)
+	return nil
 }
 
 // SARIFResult is a single finding in a SARIF run.
@@ -411,7 +436,7 @@ func buildSARIFRules(entries []sarifEntry) ([]SARIFRule, map[string]int) {
 			HelpURI: helpURI,
 			Properties: SARIFProperties{
 				Category:         e.category,
-				SecuritySeverity: ruleMaxSev[e.ruleID],
+				SecuritySeverity: SARIFSeverityStr(ruleMaxSev[e.ruleID]),
 			},
 		})
 	}

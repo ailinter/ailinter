@@ -44,14 +44,21 @@ jobs:
         with:
           quality-threshold: '90'
           fail-on-secrets: 'true'
-          version: 'v0.8.9'
+          version: 'latest'
 
       # ----------------------------------------------------------------
-      # Generate SARIF report and upload to GitHub Code Scanning
+      # Build AILINTER from current source (dogfooding), then generate
+      # SARIF report and upload to GitHub Code Scanning.
+      # Building from source ensures the SARIF always uses the latest
+      # code (including path normalization and security-severity fixes).
       # ----------------------------------------------------------------
+      - name: Build AILINTER from source
+        if: always()
+        run: go build -o /tmp/ailinter-ci ./cmd/ailinter
+
       - name: Generate SARIF Report
         if: always()
-        run: ailinter check . --format sarif --output ailinter-results.sarif
+        run: /tmp/ailinter-ci check . --format sarif --output ailinter-results.sarif
 
       - name: Upload SARIF to GitHub
         if: always()
