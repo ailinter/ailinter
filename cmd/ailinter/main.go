@@ -24,6 +24,7 @@ func main() {
 	root.AddCommand(cli.MCPCommand(version.Version))
 	root.AddCommand(cli.InitCommand())
 	root.AddCommand(cli.InstallHookCommand())
+	root.AddCommand(cli.GetRefactoringStrategyCommand())
 	root.AddCommand(rulesCommand())
 	root.AddCommand(telemetryCommand())
 
