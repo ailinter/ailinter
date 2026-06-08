@@ -12,6 +12,7 @@ import (
 	"github.com/ailinter/ailinter/internal/analyzer"
 	"github.com/ailinter/ailinter/internal/git"
 	"github.com/ailinter/ailinter/internal/metalinter"
+	"github.com/ailinter/ailinter/internal/refactoring"
 	"github.com/ailinter/ailinter/internal/secrets"
 	"github.com/ailinter/ailinter/internal/version"
 	"github.com/ailinter/ailinter/internal/vulnerability"
@@ -54,13 +55,26 @@ type SARIFRule struct {
 	Name             string          `json:"name"`
 	ShortDescription SARIFMessage    `json:"shortDescription"`
 	HelpURI          string          `json:"helpUri,omitempty"`
+	Help             *SARIFHelp      `json:"help,omitempty"`
 	Properties       SARIFProperties `json:"properties,omitempty"`
+}
+
+// SARIFHelp provides documentation for a rule. GitHub Code Scanning
+// displays the markdown content when the user clicks "Show more" on a
+// SARIF alert. The text field is a plain-text fallback.
+type SARIFHelp struct {
+	Text     string `json:"text,omitempty"`
+	Markdown string `json:"markdown,omitempty"`
 }
 
 // SARIFProperties holds optional metadata on a rule.
 type SARIFProperties struct {
 	Category         string           `json:"category,omitempty"`
 	SecuritySeverity SARIFSeverityStr `json:"security-severity,omitempty"`
+	Precision        string           `json:"precision,omitempty"`        // "very-high", "high", "medium", "low"
+	Tags             []string         `json:"tags,omitempty"`             // e.g. ["maintainability", "complexity"]
+	Severity         string           `json:"problem.severity,omitempty"` // "error", "warning", "note"
+	SmellType        string           `json:"smell_type,omitempty"`       // e.g. "deep_nesting"
 }
 
 // SARIFSeverityStr is a float64 that marshals to a JSON string,
@@ -127,13 +141,14 @@ type SARIFRegion struct {
 // ---------------------------------------------------------------------------
 
 type sarifEntry struct {
-	ruleID   string
-	severity string
-	filePath string
-	line     int
-	column   int
-	message  string
-	category string
+	ruleID    string
+	severity  string
+	filePath  string
+	line      int
+	column    int
+	message   string
+	category  string
+	smellType string // for quality smells, the smell name used to look up refactoring help
 }
 
 // ---------------------------------------------------------------------------
@@ -161,13 +176,14 @@ func appendQualityEntries(entries []sarifEntry, results []analyzer.QualityResult
 				continue
 			}
 			entries = append(entries, sarifEntry{
-				ruleID:   s.Name,
-				severity: s.Severity,
-				filePath: r.FilePath,
-				line:     s.LineStart,
-				column:   1,
-				message:  s.Message,
-				category: "quality",
+				ruleID:    s.Name,
+				severity:  s.Severity,
+				filePath:  r.FilePath,
+				line:      s.LineStart,
+				column:    1,
+				message:   s.Message,
+				category:  "quality",
+				smellType: s.Name,
 			})
 		}
 	}
@@ -391,8 +407,10 @@ func encodeSARIF(w io.Writer, log SARIFLog) error {
 
 // buildSARIFRules extracts a de-duplicated list of rules from entries.
 // Returns the rules slice and a map of ruleID → ruleIndex.
-// Each rule includes a security-severity score (for GitHub severity taxonomy)
-// and a stable name/description from the curated ruleDescriptions map.
+// Each rule includes enriched properties: precision, tags, severity,
+// security-severity score (for GitHub severity taxonomy), smell type,
+// specific HelpURI anchors, and a stable name/description from the
+// curated ruleDescriptions map.
 func buildSARIFRules(entries []sarifEntry) ([]SARIFRule, map[string]int) {
 	// First pass: compute maximum severity score per rule across all entries.
 	ruleMaxSev := make(map[string]float64)
@@ -414,20 +432,74 @@ func buildSARIFRules(entries []sarifEntry) ([]SARIFRule, map[string]int) {
 		seen[e.ruleID] = true
 		ruleIndex[e.ruleID] = len(rules)
 
-		helpURI := "https://ailinter.dev/docs"
+		// Precision: quality rules are very-high (structural analysis),
+		// secrets are high (pattern match), vulns very-high (pattern based),
+		// metalinter very-high (static analysis tools).
+		precision := "very-high"
+		if e.category == "secret" {
+			precision = "high"
+		}
+
+		// Tags for filtering in GitHub Code Scanning.
+		var tags []string
 		switch e.category {
-		case "secret":
-			helpURI = "https://ailinter.dev/docs/secrets"
-		case "vulnerability":
-			helpURI = "https://ailinter.dev/docs/vulnerabilities"
 		case "quality":
-			helpURI = "https://ailinter.dev/docs/quality"
+			tags = []string{"maintainability", "code-quality"}
+		case "secret":
+			tags = []string{"security", "secret-detection"}
+		case "vulnerability":
+			tags = []string{"security", "vulnerability"}
 		case "meta-lint":
-			helpURI = "https://ailinter.dev/docs/meta-lint"
+			tags = []string{"maintainability", "static-analysis"}
+		}
+
+		// HelpURI with specific anchor when available.
+		helpURI := "https://ailinter.dev/docs"
+		if e.category == "quality" && e.smellType != "" {
+			helpURI = fmt.Sprintf("https://ailinter.dev/docs/quality#%s", e.smellType)
+		} else {
+			switch e.category {
+			case "secret":
+				helpURI = "https://ailinter.dev/docs/secrets"
+			case "vulnerability":
+				helpURI = "https://ailinter.dev/docs/vulnerabilities"
+			case "quality":
+				helpURI = "https://ailinter.dev/docs/quality"
+			case "meta-lint":
+				helpURI = "https://ailinter.dev/docs/meta-lint"
+			}
+		}
+
+		// Severity mapping for the rule-level problem.severity.
+		var severity string
+		switch e.severity {
+		case "critical", "error":
+			severity = "error"
+		case "warning":
+			severity = "warning"
+		default:
+			severity = "note"
+		}
+
+		// Security severity — only meaningful for vulnerabilities.
+		var secSev SARIFSeverityStr
+		if e.category == "vulnerability" {
+			switch e.severity {
+			case "critical":
+				secSev = 9.5
+			case "error":
+				secSev = 7.5
+			case "warning":
+				secSev = 5.0
+			default:
+				secSev = 3.0
+			}
+		} else {
+			secSev = SARIFSeverityStr(ruleMaxSev[e.ruleID])
 		}
 
 		name := ruleName(e.ruleID)
-		rules = append(rules, SARIFRule{
+		rule := SARIFRule{
 			ID:   e.ruleID,
 			Name: name,
 			ShortDescription: SARIFMessage{
@@ -436,9 +508,27 @@ func buildSARIFRules(entries []sarifEntry) ([]SARIFRule, map[string]int) {
 			HelpURI: helpURI,
 			Properties: SARIFProperties{
 				Category:         e.category,
-				SecuritySeverity: SARIFSeverityStr(ruleMaxSev[e.ruleID]),
+				SecuritySeverity: secSev,
+				Precision:        precision,
+				Tags:             tags,
+				Severity:         severity,
+				SmellType:        e.smellType,
 			},
-		})
+		}
+
+		// For quality smells, embed the refactoring strategy as help.markdown
+		// so GitHub Code Scanning displays actionable guidance instead of
+		// "No rule help available for this alert."
+		if e.category == "quality" && e.smellType != "" {
+			if strategy := refactoring.Lookup(e.smellType); strategy != nil && strategy.Content != "" {
+				rule.Help = &SARIFHelp{
+					Text:     fmt.Sprintf("Refactoring guidance for %s", e.smellType),
+					Markdown: strategy.Content,
+				}
+			}
+		}
+
+		rules = append(rules, rule)
 	}
 
 	return rules, ruleIndex
