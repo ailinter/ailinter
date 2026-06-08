@@ -2,7 +2,7 @@
 
 Complete reference for all AILINTER CLI commands.
 
-> **This page is under construction.** For now, see the [README](https://github.com/ailinter/ailinter#cli) for CLI command documentation.
+> Complete CLI reference for ailinter v1.0.0. See the [README](https://github.com/ailinter/ailinter#cli) for a quick-start overview.
 
 ## Commands Overview
 
@@ -24,7 +24,7 @@ ailinter check [files...] [flags]
 
 | Flag | Description |
 |------|-------------|
-| `--format` | Output format: `table` (default), `json`, `markdown`, `problems` |
+| `--format` | Output format: `table` (default), `json`, `markdown`, `problems`, `sarif` |
 | `--no-secrets` | Skip secret scanning |
 | `--no-vulnerabilities` | Skip vulnerability scanning |
 | `--secrets-only` | Only scan for secrets |
@@ -32,6 +32,8 @@ ailinter check [files...] [flags]
 | `--lang` | Force language detection |
 | `--no-gitignore` | Don't respect `.gitignore` patterns |
 | `--estimate-tokens` | Estimate AI token cost |
+| `--diff <ref>` | Diff-aware: scan only lines changed relative to a git ref |
+| `--output <file>` | Write output to file (used with `--format sarif`) |
 
 ## `ailinter init`
 

@@ -2,7 +2,7 @@
 
 AILINTER detects hardcoded secrets using 269+ rules from betterleaks with a gitleaks fallback — covering 100+ providers.
 
-> **This page is under construction.** For now, see the [README](https://github.com/ailinter/ailinter#secret-detection-rules).
+> Reference for ailinter's secret scanning. For a quick overview, see the [README](https://github.com/ailinter/ailinter#-what-it-checks).
 
 ## Coverage
 

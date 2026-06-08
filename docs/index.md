@@ -1,14 +1,24 @@
 # AILINTER Documentation
 
-Welcome to AILINTER — the open-source AI Code Safety Visor. This site covers installation, usage, integration, and reference materials.
+Welcome to AILINTER v1.0.0 — the open-source AI Code Safety Visor. This site covers installation, usage, integration, and reference materials.
 
 ## Quick Summary
 
 ```
-One 30 MB binary · 20 quality detectors · 269+ secret rules · 58 vulnerability patterns · 7 MCP tools · Zero dependencies
+One 30 MB binary · 20 quality detectors · 269+ secret rules · 58 vulnerability patterns · 24 refactoring strategies · 7 MCP tools · SARIF output · Zero dependencies
 ```
 
 AILINTER gives your AI coding assistant a safety checklist. Before the AI writes a line — and after — it evaluates the file and tells the AI whether to **Go Ahead**, **Proceed with Care**, or **Stop & Refactor**.
+
+## v1.0 Highlights
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| ✅ **VS Code Extension** | Released | Inline diagnostics, status bar score, problem matcher — install from [Marketplace](https://marketplace.visualstudio.com/items?itemName=ailinter.ailinter) |
+| ✅ **SARIF Output** | v2.1.0 | GitHub Code Scanning integration, enterprise CI, rich metadata |
+| ✅ **Diff-Aware Analysis** | `--diff` flag | Scan only changed lines — fast for large repos |
+| ✅ **24 Refactoring Strategies** | Expanded | Complete coverage: pure smells to data-oriented to inheritance |
+| ✅ **API Stable** | v1 API | Backward-compatible CLI flags and MCP tool signatures |
 
 ## Getting Started
 
@@ -16,8 +26,9 @@ AILINTER gives your AI coding assistant a safety checklist. Before the AI writes
 |------|-------------------|
 | [Installation](installation.md) | All install methods: Homebrew, Go install, binary download, Docker |
 | [Quick Start](https://github.com/ailinter/ailinter#-quick-start) | 30-second setup on the README |
+| **VS Code Extension** | Inline diagnostics, status bar score — install from [Marketplace](https://marketplace.visualstudio.com/items?itemName=ailinter.ailinter) |
 | [MCP Integration](mcp.md) | Connect AILINTER to Claude, Cursor, Cline, OpenCode, Windsurf, Copilot, Continue |
-| [CI Integration](ci.md) | GitHub Actions workflow, quality gates, secret blocking |
+| [CI Integration](ci.md) | GitHub Actions workflow, SARIF upload, quality gates, secret blocking, diff-aware analysis |
 
 ## Core Concepts
 
@@ -27,7 +38,7 @@ AILINTER gives your AI coding assistant a safety checklist. Before the AI writes
 | [Quality Scoring](quality.md) | The 0–100 score, 20 detectors, AI guidance tiers |
 | [Secret Scanning](secrets.md) | 269+ rules, 100+ providers, redacted output |
 | [Vulnerability Patterns](vulnerabilities.md) | 58 patterns across 6 categories |
-| [Refactoring Strategies](refactoring.md) | 8+ code smells with step-by-step fixes |
+| [Refactoring Strategies](refactoring.md) | 24 code smells with step-by-step fixes |
 | [Configuration](configuration.md) | `.ailinter.toml` reference, thresholds, profiles |
 
 ## Reference
@@ -63,6 +74,9 @@ brew install ailinter/ailinter/ailinter
 
 # Any platform (Go)
 go install github.com/ailinter/ailinter/cmd/ailinter@latest
+
+# VS Code
+# → Install from marketplace: https://marketplace.visualstudio.com/items?itemName=ailinter.ailinter
 ```
 
 ### Scan
@@ -71,7 +85,9 @@ go install github.com/ailinter/ailinter/cmd/ailinter@latest
 ailinter check .                    # Full scan (quality + secrets + vulns)
 ailinter check main.go              # Single file
 ailinter check --secrets-only .     # Secrets only
+ailinter check --format sarif .     # SARIF for GitHub Code Scanning
 ailinter check --format json .      # Machine-readable output
+ailinter check --diff main .        # Diff-aware (only changed lines)
 ```
 
 ### MCP

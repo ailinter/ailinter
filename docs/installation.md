@@ -1,6 +1,6 @@
 # Installation
 
-AILINTER is a single 30 MB Go binary with zero runtime dependencies. Install it on macOS, Linux, or Windows.
+AILINTER v1.0.0 is a single 30 MB Go binary with zero runtime dependencies. Install it on macOS, Linux, or Windows — or install the VS Code extension for inline editor integration.
 
 ---
 
@@ -13,7 +13,7 @@ brew install ailinter/ailinter/ailinter
 Verify:
 ```bash
 ailinter version
-# → ailinter v0.9.0 (30 MB, zero dependencies)
+# → ailinter v1.0.0 (30 MB, zero dependencies)
 ```
 
 ## Linux (amd64 / arm64)
@@ -70,6 +70,31 @@ docker pull ailinter/ailinter
 # Scan your code
 docker run -v $(pwd):/code ailinter/ailinter check /code
 ```
+
+## VS Code Extension
+
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ailinter.ailinter):
+
+1. Open VS Code
+2. Go to Extensions (`Cmd+Shift+X` / `Ctrl+Shift+X`)
+3. Search for "AILINTER"
+4. Click **Install**
+
+Or install via command line:
+
+```bash
+code --install-extension ailinter.ailinter
+```
+
+Once installed:
+- **Inline diagnostics** appear in the Problems panel when you open a file
+- **Status bar** shows the current file's quality score and issue count
+- **Run on save** automatically checks files on save (configurable)
+- **Problem matcher** maps ailinter output to VS Code's diagnostic system
+
+No manual MCP config needed — the extension handles the connection.
+
+---
 
 ## Verify Installation
 

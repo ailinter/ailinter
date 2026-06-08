@@ -5,18 +5,20 @@
 
 # AILINTER — AI Code Safety Visor
 
-[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev/)
+[![Version](https://img.shields.io/badge/version-v1.0.0-22C55E)](https://github.com/ailinter/ailinter/releases)
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ailinter/ailinter)](https://goreportcard.com/report/github.com/ailinter/ailinter)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-6e41e2)](https://modelcontextprotocol.io)
+[![VS Code](https://img.shields.io/badge/VS_Code-Extension-007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=ailinter.ailinter)
 [![Tests](https://img.shields.io/badge/tests-passing-22C55E)](https://github.com/ailinter/ailinter/actions)
 [![Binary](https://img.shields.io/badge/binary-30MB-lightgrey)](https://github.com/ailinter/ailinter/releases)
-[![Benchmark](https://img.shields.io/badge/secret_detection-100%25_recall-22C55E)](https://github.com/ailinter/ailinter#benchmarks)
+[![SARIF](https://img.shields.io/badge/SARIF-v2.1.0-0078D7)](https://docs.oasis-open.org/sarif/sarif/v2.1.0/)
 [![SecretBench](https://img.shields.io/badge/SecretBench-203%25_recall_vs_Gitleaks-7c3aed)](https://github.com/ailinter/ailinter#benchmarks)
 
-**One 30 MB binary. 269+ secret rules. 58 vulnerability patterns. 7 MCP tools. Zero dependencies.**
+**One 30 MB binary. 269+ secret rules. 58 vulnerability patterns. 24 refactoring strategies. 7 MCP tools. SARIF output. Zero dependencies.**
 
-AILINTER is an open-source safety visor for AI-assisted development. It scans your code for quality issues, hardcoded secrets, and vulnerabilities before AI touches it — and validates AI-generated code before you commit it.
+AILINTER is an open-source safety visor for AI-assisted development. It scans your code for quality issues, hardcoded secrets, and vulnerabilities before AI touches it — and validates AI-generated code before you commit it. With **VS Code extension**, **SARIF output for GitHub Code Scanning**, and **diff-aware analysis**, v1.0.0 is the most comprehensive AI code safety tool available.
 
 <p align="center">
   Created by <a href="https://github.com/IvanBern">Ivan Bernikov</a>
@@ -29,6 +31,8 @@ AILINTER is an open-source safety visor for AI-assisted development. It scans yo
 
 ## ⚡ Quick Start
 
+### Install
+
 ```bash
 # macOS (Homebrew)
 brew install ailinter/ailinter/ailinter
@@ -36,14 +40,31 @@ brew install ailinter/ailinter/ailinter
 # Linux / Windows (download binary)
 # → https://github.com/ailinter/ailinter/releases
 
-# Scan your repo
-ailinter check .
+# Any platform (Go)
+go install github.com/ailinter/ailinter/cmd/ailinter@latest
 
-# Interactive setup (agents, hooks, VS Code)
-ailinter init
+# Docker
+docker pull ailinter/ailinter
+```
 
-# Or just start the MCP server for your AI assistant
-ailinter mcp
+### VS Code
+
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ailinter.ailinter) — inline diagnostics, status bar score, and problem matcher.
+
+### Scan Your Project
+
+```bash
+ailinter check .                    # Full scan (quality + secrets + vulns)
+ailinter check --format sarif .     # SARIF for GitHub Code Scanning
+ailinter check --format problems .  # Problem matcher output for VS Code
+```
+
+### Interactive Setup
+
+```bash
+ailinter init                        # Setup agents, hooks, VS Code config
+ailinter init --agent all --vscode --hook  # Everything at once
+ailinter mcp                         # Start MCP server for your AI assistant
 ```
 
 **30 seconds to install. 10 seconds to scan. Zero configuration required.**
@@ -57,7 +78,10 @@ ailinter mcp
 | **Code Quality** | 20 detectors, 0–100 scoring | Deep nesting, brain methods, bumpy roads, complex conditionals, duplication, low cohesion, primitive obsession, global data, and 12 more |
 | **Secrets** | 269+ rules, 100+ providers | AWS keys, GitHub PATs, Stripe tokens, Slack tokens, OpenAI keys, private keys, JWTs — all redacted in AI context |
 | **Vulnerabilities** | 58 patterns, 6 categories | SQL injection, XSS, command injection, deserialization, weak crypto, XXE, workflow attacks — across Python, Go, JS/TS, Java, C#, PHP |
+| **Refactoring Strategies** | 24 embedded patterns | Deep nesting, brain method, god class, long parameter list, magic numbers, shotgun surgery, parallel inheritance, and 17 more |
 | **Go Metalinting** | 5 embedded linters | `go vet`, `staticcheck`, `gofmt`, `misspell`, `ineffassign` — zero additional setup |
+| **VS Code Extension** | Diagnostics + status bar | Inline problems panel, file quality score, issue count, problem matcher |
+| **SARIF Output** | v2.1.0 compatible | GitHub Code Scanning, enterprise CI, rich metadata with refactoring guidance |
 
 **Result:** Every file gets a 0–100 quality score and a clear AI guidance label:
 
@@ -121,10 +145,31 @@ AILINTER is built for AI-assisted workflows from the ground up. Run it as an MCP
 | `analyze_code` | Full structural analysis: quality score + issues + vulnerabilities | ~200 ms |
 | `scan_for_secrets` | 269+ rule secret detection (secrets redacted in output) | ~50 ms |
 | `assess_file` | Quick safety check: "Go Ahead / Care / Stop & Refactor" | ~50 ms |
-| `get_refactoring_strategy` | Step-by-step fix instructions for 8+ code smells | ~10 ms |
+| `get_refactoring_strategy` | Step-by-step fix instructions for 24 code smells | ~10 ms |
 | `list_hotspots` | Files with highest churn × lowest quality | ~100 ms |
 | `set_config` | Manage ailinter configuration | ~10 ms |
 | `get_config` | View current configuration | ~10 ms |
+
+### 24 Refactoring Strategies
+
+When `analyze_code` finds code smells, ailinter provides step-by-step remediation for **24 patterns**:
+
+| Smell | Strategy | Smell | Strategy |
+|-------|----------|-------|----------|
+| Deep Nesting | Guard Clauses + Extract | Brain Method | Extract + SRP |
+| God Class | Extract Class + SRP | Long Parameter List | Parameter Object |
+| Primitive Obsession | Type Wrapper | Duplicated Code | Template Method |
+| Complex Conditional | Guard + Strategy | File Bloat | Extract Module |
+| Bumpy Road | Extract + Flatten | Low Cohesion | Extract Class |
+| Long Method | Extract Method | Data Class | Move Logic In |
+| Lazy Element | Inline Element | Global Data | Encapsulate |
+| Message Chains | Hide Delegate | Long Scope Variable | Reduce Scope |
+| Long Switch | Replace with Map | Magic Number | Named Constant |
+| Excessive Comments | Self-Documenting | Paragraph of Code | Extract Method |
+| Shotgun Surgery | Move + Combine | Refused Bequest | Replace Delegation |
+| Complex Method | Extract + Simplify | Parallel Inheritance | Strategy Pattern |
+
+Call `get_refactoring_strategy("smell_name")` via MCP for step-by-step instructions with before/after examples.
 
 ### The Refactoring Loop (Most Important Pattern)
 
@@ -159,18 +204,48 @@ Add this to your AI tool's MCP config file:
 }
 ```
 
-Works with: **Claude Code**, **Cursor**, **OpenCode**, **Windsurf**, **Continue.dev**, **Cline**, and any MCP-compatible agent.
+Works with: **Claude Code**, **Cursor**, **OpenCode**, **Windsurf**, **Continue.dev**, **Cline**, **GitHub Copilot**, and any MCP-compatible agent.
 
 > **One command to rule them all:** `ailinter init --agent all` creates configs for every supported agent at once.
+>
+> **In VS Code:** The VS Code extension handles MCP integration automatically — no manual config needed.
 
 ---
 
 ## 🚀 CI Integration
 
-Block PRs with low quality scores or hardcoded secrets:
+Block PRs with low quality scores, hardcoded secrets, or vulnerabilities. Supports both **quality gate** and **SARIF** workflows.
+
+### GitHub Code Scanning (SARIF)
+
+Upload results directly to the GitHub Security tab:
 
 ```yaml
-# .github/workflows/ailinter.yml
+# .github/workflows/ailinter-sarif.yml
+name: AILINTER SARIF
+on: [pull_request, push]
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install AILINTER
+        run: go install github.com/ailinter/ailinter/cmd/ailinter@latest
+      - name: Run AILINTER with SARIF output
+        run: ailinter check . --format sarif --output results.sarif
+      - name: Upload SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: ailinter
+```
+
+### Quality Gate
+
+Block PRs that don't meet minimum quality thresholds:
+
+```yaml
+# .github/workflows/ailinter-gate.yml
 name: AILINTER Quality Gate
 on: [pull_request]
 jobs:
@@ -186,6 +261,14 @@ jobs:
           ailinter check . --format json | jq -e '.score >= 80'
 ```
 
+### Diff-Aware Analysis
+
+Scan only changed lines relative to a git ref — ideal for CI on large repos:
+
+```bash
+ailinter check . --diff main
+```
+
 ---
 
 ## 📦 Distribution
@@ -197,7 +280,7 @@ jobs:
 | **Windows (amd64)** | Download from [releases](https://github.com/ailinter/ailinter/releases) |
 | **Go** | `go install github.com/ailinter/ailinter/cmd/ailinter@latest` |
 | **Docker** | `docker pull ailinter/ailinter` |
-| **VS Code** | Extension (coming soon) |
+| **VS Code** | [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ailinter.ailinter) |
 
 ---
 
@@ -213,10 +296,11 @@ internal/
 ├── config/             # JSON config + .ailinter.toml parser
 ├── mcp/                # MCP server + 7 tool handlers
 ├── parser/             # 20 code smell detectors
-├── refactoring/        # 16 embedded refactoring patterns
+├── refactoring/        # 24 embedded refactoring patterns
 ├── secrets/            # betterleaks 269-rule config + gitleaks wrapper
 ├── telemetry/          # Usage and performance metrics
 └── vulnerability/      # 58 vulnerability patterns, 6 categories
+└── (output_sarif.go)   # SARIF v2.1.0 output (GitHub Code Scanning)
 ```
 
 - **Offline-first**: All rules embedded, no API calls, no exfiltration

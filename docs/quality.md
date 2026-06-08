@@ -2,7 +2,7 @@
 
 How AILINTER's 0–100 quality score works and what each detector catches.
 
-> **This page is under construction.** For now, reference the [README](https://github.com/ailinter/ailinter#-what-it-checks).
+> Reference for ailinter's quality scoring. For a quick overview, see the [README](https://github.com/ailinter/ailinter#-what-it-checks).
 
 ## Score Tiers
 
