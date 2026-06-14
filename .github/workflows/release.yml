@@ -71,3 +71,74 @@ jobs:
           files: dist/*
           tag_name: ${{ github.ref_name }}
           generate_release_notes: true
+
+  homebrew:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate formula and push to tap
+        env:
+          VERSION: ${{ github.ref_name }}
+          GH_TOKEN: ${{ secrets.BOT_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Read checksums from the .sha256 files
+          declare -A CHECKS
+          for f in dist/*.sha256; do
+            [ -f "$f" ] || continue
+            name="$(basename "$f" .sha256)"
+            checksum="$(cut -d' ' -f1 "$f")"
+            CHECKS["$name"]="$checksum"
+          done
+
+          DARWIN_AMD64="${CHECKS[ailinter_${VERSION}_darwin_amd64]:-}"
+          DARWIN_ARM64="${CHECKS[ailinter_${VERSION}_darwin_arm64]:-}"
+          LINUX_AMD64="${CHECKS[ailinter_${VERSION}_linux_amd64]:-}"
+          LINUX_ARM64="${CHECKS[ailinter_${VERSION}_linux_arm64]:-}"
+
+          if [ -z "$DARWIN_AMD64" ] || [ -z "$DARWIN_ARM64" ] || \
+             [ -z "$LINUX_AMD64" ] || [ -z "$LINUX_ARM64" ]; then
+            echo "ERROR: missing checksums" >&2
+            echo "Found checksums for: ${!CHECKS[*]}" >&2
+            exit 1
+          fi
+
+          # Clone the tap repo and update the formula
+          git config --global user.name "ailinter-bot"
+          git config --global user.email "bot@ailinter.dev"
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/ailinter/homebrew-ailinter.git" /tmp/homebrew-tap
+          cd /tmp/homebrew-tap
+
+          # Update version string
+          sed -i 's/version ".*"/version "'"${VERSION}"'"/' Formula/ailinter.rb
+
+          # Update macOS URLs and checksums
+          sed -i "s|url \".*darwin_arm64\"|url \"https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_${VERSION}_darwin_arm64\"|" Formula/ailinter.rb
+          sed -i "s|url \".*darwin_amd64\"|url \"https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_${VERSION}_darwin_amd64\"|" Formula/ailinter.rb
+          sed -i "s|url \".*linux_arm64\"|url \"https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_${VERSION}_linux_arm64\"|" Formula/ailinter.rb
+          sed -i "s|url \".*linux_amd64\"|url \"https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_${VERSION}_linux_amd64\"|" Formula/ailinter.rb
+
+          # Update checksums — each sha256 line follows its url line
+          awk -v c="$DARWIN_ARM64" '/url.*darwin_arm64/{getline; sub(/sha256 ".*"/, "sha256 \""c"\""); print; next} 1' Formula/ailinter.rb > /tmp/f.rb && mv /tmp/f.rb Formula/ailinter.rb
+          awk -v c="$DARWIN_AMD64" '/url.*darwin_amd64/{getline; sub(/sha256 ".*"/, "sha256 \""c"\""); print; next} 1' Formula/ailinter.rb > /tmp/f.rb && mv /tmp/f.rb Formula/ailinter.rb
+          awk -v c="$LINUX_ARM64" '/url.*linux_arm64/{getline; sub(/sha256 ".*"/, "sha256 \""c"\""); print; next} 1' Formula/ailinter.rb > /tmp/f.rb && mv /tmp/f.rb Formula/ailinter.rb
+          awk -v c="$LINUX_AMD64" '/url.*linux_amd64/{getline; sub(/sha256 ".*"/, "sha256 \""c"\""); print; next} 1' Formula/ailinter.rb > /tmp/f.rb && mv /tmp/f.rb Formula/ailinter.rb
+
+          # Commit and push
+          if git diff --quiet; then
+            echo "Formula is already up to date for ${VERSION}"
+          else
+            git add Formula/ailinter.rb
+            git commit -m "chore: update Homebrew formula to ${VERSION}"
+            git push origin main
+            echo "✅ Homebrew formula updated to ${VERSION}"
+          fi

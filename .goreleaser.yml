@@ -1,0 +1,95 @@
+# GoReleaser configuration
+# https://goreleaser.com
+#
+# Builds cross-platform binaries, generates checksums,
+# and pushes the Homebrew formula to ailinter/homebrew-ailinter.
+#
+# To test locally:
+#   goreleaser release --snapshot --clean --skip=publish
+#
+# To do a dry run:
+#   goreleaser release --snapshot --clean --skip=publish,announce
+
+version: 2
+
+project_name: ailinter
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: ailinter
+    main: ./cmd/ailinter
+    binary: ailinter
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/ailinter/ailinter/internal/version.Version=v{{.Version}}
+      - -X github.com/ailinter/ailinter/internal/version.Commit={{.Commit}}
+      - -X github.com/ailinter/ailinter/internal/version.BuildDate={{.Date}}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: ailinter
+    format: binary
+    name_template: "{{ .ProjectName }}_v{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}_v{{ .Arm }}{{ end }}"
+    allow_different_binary_count: true
+
+checksum:
+  name_template: "{{ .ProjectName }}_v{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  name_template: "{{ .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore"
+      - "^ci:"
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: ailinter
+    name: ailinter
+  prerelease: auto
+  make_latest: true
+
+brews:
+  - name: ailinter
+    repository:
+      owner: ailinter
+      name: homebrew-ailinter
+      branch: main
+    directory: Formula
+    homepage: "https://github.com/ailinter/ailinter"
+    description: "AI-powered code quality linter and safety visor for AI-assisted development"
+    license: "MIT"
+    url_template: "https://github.com/ailinter/ailinter/releases/download/v{{ .Version }}/{{ .ArtifactName }}"
+    commit_author:
+      name: ailinter-bot
+      email: bot@ailinter.dev
+    commit_msg_template: "chore: update Homebrew formula to v{{ .Version }}"
+    install: |
+      bin.install Dir["*"].first => "ailinter"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/ailinter --version")
