@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ailinter/ops/main/branding/logo/icon.png">
-  <img alt="ailinter" src="https://raw.githubusercontent.com/ailinter/ops/main/branding/logo/icon.png" width="100" align="right">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ailinter/ops/main/branding/logo/concept-10.png">
+  <img alt="ailinter" src="https://raw.githubusercontent.com/ailinter/ops/main/branding/logo/concept-10.png" width="100" align="right">
 </picture>
 
 # AILINTER — AI Code Safety Visor
@@ -35,6 +35,7 @@ AILINTER is an open-source safety visor for AI-assisted development. It scans yo
 
 ```bash
 # macOS (Homebrew)
+brew tap ailinter/ailinter && brew trust ailinter/ailinter
 brew install ailinter/ailinter/ailinter
 
 # Linux / Windows (download binary)
@@ -275,7 +276,7 @@ ailinter check . --diff main
 
 | Platform | Method |
 |----------|--------|
-| **macOS** | `brew install ailinter/ailinter/ailinter` |
+| **macOS** | `brew tap ailinter/ailinter && brew trust ailinter/ailinter` then `brew install ailinter/ailinter/ailinter` |
 | **Linux (amd64/arm64)** | Download from [releases](https://github.com/ailinter/ailinter/releases) |
 | **Windows (amd64)** | Download from [releases](https://github.com/ailinter/ailinter/releases) |
 | **Go** | `go install github.com/ailinter/ailinter/cmd/ailinter@latest` |

@@ -70,6 +70,7 @@ Never skip the refactoring loop. If `analyze_code` or `assess_file` reports issu
 
 ```bash
 # macOS
+brew tap ailinter/ailinter && brew trust ailinter/ailinter
 brew install ailinter/ailinter/ailinter
 
 # Any platform (Go)

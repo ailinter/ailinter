@@ -7,6 +7,9 @@ AILINTER v1.0.0 is a single 30 MB Go binary with zero runtime dependencies. Inst
 ## macOS (Homebrew)
 
 ```bash
+# First time: tap and trust
+brew tap ailinter/ailinter && brew trust ailinter/ailinter
+# Install
 brew install ailinter/ailinter/ailinter
 ```
 
@@ -116,6 +119,7 @@ rm /tmp/test.py
 ```bash
 # Homebrew
 brew upgrade ailinter/ailinter/ailinter
+# Note: If you see "not trusted" errors, run `brew trust ailinter/ailinter` first
 
 # Go install
 go install github.com/ailinter/ailinter/cmd/ailinter@latest
@@ -148,6 +152,6 @@ rm $(go env GOPATH)/bin/ailinter
 | Problem | Solution |
 |---------|----------|
 | `ailinter: command not found` | Ensure install path is in `$PATH`. For Go install: `export PATH=$PATH:$(go env GOPATH)/bin` |
-| `brew install` fails | Run `brew update` first. If tap is missing, run `brew tap ailinter/ailinter` |
+| `brew install` fails | Run `brew update && brew tap ailinter/ailinter && brew trust ailinter/ailinter` first. If you see 'not trusted' errors, run `brew trust ailinter/ailinter` |
 | Docker permissions | Make sure the mounted volume is readable by the container UID |
 | Binary "cannot execute" | You may have downloaded the wrong architecture. Use `uname -m` to check |

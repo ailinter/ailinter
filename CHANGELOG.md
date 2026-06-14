@@ -236,7 +236,7 @@
   - `ailinter telemetry` command shows what is collected
 - **Proper versioning**: `debug.ReadBuildInfo()` embeds version for `go install @v0.8.1`, ldflags for release builds
 - **Pre-built binaries** on GitHub Releases for all platforms
-- **Homebrew tap**: `brew install ailinter/ailinter/ailinter`
+- **Homebrew tap**: `brew install ailinter/ailinter/ailinter` (Note: newer Homebrew requires `brew trust ailinter/ailinter` before first install)
 
 ### Changed
 - Version from `0.5.0-dev` → `v0.8.1`
