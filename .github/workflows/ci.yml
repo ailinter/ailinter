@@ -30,6 +30,10 @@ jobs:
         run: |
           fmt=$(go fmt ./...)
           if [ -n "$fmt" ]; then echo "$fmt"; exit 1; fi
+      - name: Install staticcheck
+        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+      - name: staticcheck
+        run: staticcheck ./...
 
   test:
     name: Test
