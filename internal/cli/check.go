@@ -246,11 +246,11 @@ func executeCheckDiff(target string, opts checkOptions, respectGitignore bool, i
 	return checkFile(target, optsWithRanges, ranges...)
 }
 
-// checkDirectoryDiff scans only changed files within a directory.
-func checkDirectoryDiff(resolvedDir, repoRoot string, changedSet map[string]bool, opts checkOptions, respectGitignore bool) error {
-	scanQuality := !opts.secretsOnly && !opts.vulnerabilitiesOnly    // gitleaks:allow
-	scanSecrets := !opts.noSecrets || opts.secretsOnly               // gitleaks:allow
-	scanVulns := !opts.noVulnerabilities || opts.vulnerabilitiesOnly // gitleaks:allow
+// makeWalkContext creates a walkContext from the provided options.
+func makeWalkContext(resolvedDir string, opts checkOptions, respectGitignore bool, isDiffMode bool, diffRepoRoot string, diffChangedSet map[string]bool) *walkContext {
+	scanQuality := !opts.secretsOnly && !opts.vulnerabilitiesOnly
+	scanSecrets := !opts.noSecrets || opts.secretsOnly
+	scanVulns := !opts.noVulnerabilities || opts.vulnerabilitiesOnly
 
 	configDir := config.FindConfigDir(resolvedDir)
 	ctx := &walkContext{
@@ -263,10 +263,11 @@ func checkDirectoryDiff(resolvedDir, repoRoot string, changedSet map[string]bool
 		scanner:        nil,
 		vulnScanner:    nil,
 		langCount:      make(map[string]int),
-		isDiffMode:     true,
-		diffRepoRoot:   repoRoot,
-		diffChangedSet: changedSet,
+		isDiffMode:     isDiffMode,
+		diffRepoRoot:   diffRepoRoot,
+		diffChangedSet: diffChangedSet,
 		diffRef:        opts.diffRef,
+		outputPath:     opts.outputPath,
 	}
 	if respectGitignore {
 		ctx.gitignorePats = loadGitignore(resolvedDir)
@@ -277,6 +278,12 @@ func checkDirectoryDiff(resolvedDir, repoRoot string, changedSet map[string]bool
 	if scanVulns {
 		ctx.vulnScanner = vulnerability.NewScanner()
 	}
+	return ctx
+}
+
+// checkDirectoryDiff scans only changed files within a directory.
+func checkDirectoryDiff(resolvedDir, repoRoot string, changedSet map[string]bool, opts checkOptions, respectGitignore bool) error {
+	ctx := makeWalkContext(resolvedDir, opts, respectGitignore, true, repoRoot, changedSet)
 
 	err := filepath.WalkDir(resolvedDir, ctx.walkFn)
 	if err != nil {
@@ -317,15 +324,8 @@ func checkFile(path string, opts checkOptions, diffRanges ...git.LineRange) erro
 		return err
 	}
 
-	// Check if this file is excluded via .ailinter.toml
-	resolvedDir := filepath.Dir(resolved)
-	excludePats := config.LoadExcludedFiles(resolvedDir)
-	configDir := config.FindConfigDir(resolvedDir)
-	if len(excludePats) > 0 && configDir != "" && config.IsExcluded(resolved, excludePats, configDir) {
-		if !opts.quiet {
-			fmt.Fprintf(os.Stderr, "skipped (excluded by .ailinter.toml): %s\n", resolved)
-		}
-		return nil
+	if err := checkFileExcluded(resolved, opts); err != nil {
+		return nil // excluded, not an error
 	}
 
 	data, err := os.ReadFile(resolved)
@@ -333,50 +333,16 @@ func checkFile(path string, opts checkOptions, diffRanges ...git.LineRange) erro
 		telemetry.RecordError("file_read")
 		return fmt.Errorf("failed to read %s: %w", resolved, err)
 	}
-
 	if isBinary(data) {
 		telemetry.RecordError("binary_file")
 		return fmt.Errorf("cannot analyze binary file: %s", resolved)
 	}
 
 	if opts.secretsOnly {
-		if !opts.quiet {
-			if opts.format == FormatSARIF {
-				scanner, secErr := secrets.NewScanner()
-				var secFindings []secrets.SecretFinding
-				if secErr == nil {
-					secFindings = scanner.ScanBytes(data, resolved)
-				}
-				out := sarifOutput(opts.outputPath)
-				WriteSARIFCombined(out, nil, secFindings, nil, nil, resolved)
-				if closer, ok := out.(io.Closer); ok && out != os.Stdout {
-					closer.Close()
-				}
-			} else {
-				scanAndWriteSecrets(resolved, data, opts.format)
-			}
-		}
-		telemetry.RecordDuration("check_file", "", time.Since(start).Seconds())
-		return nil
+		return checkFileSecretsOnly(resolved, data, opts, start)
 	}
 	if opts.vulnerabilitiesOnly {
-		if !opts.quiet {
-			if opts.format == FormatSARIF {
-				vulnScanner := vulnerability.NewScanner()
-				vulnFindings := vulnScanner.Scan(string(data), resolved)
-				out := sarifOutput(opts.outputPath)
-				WriteSARIFCombined(out, nil, nil, vulnFindings, nil, resolved)
-				if closer, ok := out.(io.Closer); ok && out != os.Stdout {
-					closer.Close()
-				}
-			} else {
-				vulnScanner := vulnerability.NewScanner()
-				vulnFindings := vulnScanner.Scan(string(data), resolved)
-				writeVulnerabilities(opts.format, resolved, vulnFindings)
-			}
-		}
-		telemetry.RecordDuration("check_file", "", time.Since(start).Seconds())
-		return nil
+		return checkFileVulnerabilitiesOnly(resolved, data, opts, start)
 	}
 
 	lang := opts.detectLang(resolved)
@@ -384,7 +350,6 @@ func checkFile(path string, opts checkOptions, diffRanges ...git.LineRange) erro
 	thresholds := config.LoadProjectThresholds(resolved, lang)
 	result := analyzer.Analyze(analyzer.SourceInput{FilePath: resolved, Source: string(data), Lang: lang}, thresholds)
 
-	// In diff mode, filter smells to only those in the changed line ranges.
 	if len(diffRanges) > 0 {
 		diffModeAnnotate(&result, diffRanges)
 	}
@@ -400,45 +365,111 @@ func checkFile(path string, opts checkOptions, diffRanges ...git.LineRange) erro
 		return nil
 	}
 
-	if opts.format == FormatJSON {
+	switch opts.format {
+	case FormatJSON:
 		writeCombinedJSON(result, data, resolved, opts.noSecrets, opts.noVulnerabilities)
-		telemetry.RecordDuration("check_file", lang, time.Since(start).Seconds())
-		return nil
+	case FormatSARIF:
+		if err := checkFileSARIF(result, data, resolved, ext, opts); err != nil {
+			return err
+		}
+	default:
+		writeResult(opts.format, result)
+		checkFileExtraScans(resolved, data, ext, opts)
+		if opts.estimateTokens {
+			estimator := analyzer.NewTokenEstimator(resolved, result.Score)
+			fmt.Print("\n" + estimator.FormatEstimateOutput())
+		}
 	}
 
-	if opts.format == FormatSARIF {
-		// Collect meta-lint findings for Go files
-		var mlFindings []metalinter.Finding
-		if opts.metaLint && ext == ".go" {
-			mlFindings, _ = metalinter.LintGo([]string{resolved})
+	telemetry.RecordDuration("check_file", lang, time.Since(start).Seconds())
+	return nil
+}
+
+// checkFileExcluded returns an error if the file is excluded, nil otherwise.
+func checkFileExcluded(resolved string, opts checkOptions) error {
+	resolvedDir := filepath.Dir(resolved)
+	excludePats := config.LoadExcludedFiles(resolvedDir)
+	configDir := config.FindConfigDir(resolvedDir)
+	if len(excludePats) > 0 && configDir != "" && config.IsExcluded(resolved, excludePats, configDir) {
+		if !opts.quiet {
+			fmt.Fprintf(os.Stderr, "skipped (excluded by .ailinter.toml): %s\n", resolved)
 		}
-		// Scan secrets if enabled
-		var secFindings []secrets.SecretFinding
-		if !opts.noSecrets {
+		return errExcluded
+	}
+	return nil
+}
+
+var errExcluded = fmt.Errorf("excluded")
+
+func checkFileSecretsOnly(resolved string, data []byte, opts checkOptions, start time.Time) error {
+	if !opts.quiet {
+		if opts.format == FormatSARIF {
 			scanner, secErr := secrets.NewScanner()
+			var secFindings []secrets.SecretFinding
 			if secErr == nil {
 				secFindings = scanner.ScanBytes(data, resolved)
 			}
+			out := sarifOutput(opts.outputPath)
+			WriteSARIFCombined(out, nil, secFindings, nil, nil, resolved)
+			if closer, ok := out.(io.Closer); ok && out != os.Stdout {
+				closer.Close()
+			}
+		} else {
+			scanAndWriteSecrets(resolved, data, opts.format)
 		}
-		// Scan vulnerabilities if enabled
-		var vulnFindings []vulnerability.Finding
-		if !opts.noVulnerabilities {
-			vulnScanner := vulnerability.NewScanner()
-			vulnFindings = vulnScanner.Scan(string(data), resolved)
-		}
-		out := sarifOutput(opts.outputPath)
-		if err := WriteSARIFCombined(out, []analyzer.QualityResult{result}, secFindings, vulnFindings, mlFindings, resolved); err != nil {
-			return fmt.Errorf("failed to write SARIF output: %w", err)
-		}
-		// Close the file if we opened one
-		if closer, ok := out.(io.Closer); ok && out != os.Stdout {
-			closer.Close()
-		}
-		telemetry.RecordDuration("check_file", lang, time.Since(start).Seconds())
-		return nil
 	}
+	telemetry.RecordDuration("check_file", "", time.Since(start).Seconds())
+	return nil
+}
 
-	writeResult(opts.format, result)
+func checkFileVulnerabilitiesOnly(resolved string, data []byte, opts checkOptions, start time.Time) error {
+	if !opts.quiet {
+		if opts.format == FormatSARIF {
+			vulnScanner := vulnerability.NewScanner()
+			vulnFindings := vulnScanner.Scan(string(data), resolved)
+			out := sarifOutput(opts.outputPath)
+			WriteSARIFCombined(out, nil, nil, vulnFindings, nil, resolved)
+			if closer, ok := out.(io.Closer); ok && out != os.Stdout {
+				closer.Close()
+			}
+		} else {
+			vulnScanner := vulnerability.NewScanner()
+			vulnFindings := vulnScanner.Scan(string(data), resolved)
+			writeVulnerabilities(opts.format, resolved, vulnFindings)
+		}
+	}
+	telemetry.RecordDuration("check_file", "", time.Since(start).Seconds())
+	return nil
+}
+
+func checkFileSARIF(result analyzer.QualityResult, data []byte, resolved, ext string, opts checkOptions) error {
+	var mlFindings []metalinter.Finding
+	if opts.metaLint && ext == ".go" {
+		mlFindings, _ = metalinter.LintGo([]string{resolved})
+	}
+	var secFindings []secrets.SecretFinding
+	if !opts.noSecrets {
+		scanner, secErr := secrets.NewScanner()
+		if secErr == nil {
+			secFindings = scanner.ScanBytes(data, resolved)
+		}
+	}
+	var vulnFindings []vulnerability.Finding
+	if !opts.noVulnerabilities {
+		vulnScanner := vulnerability.NewScanner()
+		vulnFindings = vulnScanner.Scan(string(data), resolved)
+	}
+	out := sarifOutput(opts.outputPath)
+	if err := WriteSARIFCombined(out, []analyzer.QualityResult{result}, secFindings, vulnFindings, mlFindings, resolved); err != nil {
+		return fmt.Errorf("failed to write SARIF output: %w", err)
+	}
+	if closer, ok := out.(io.Closer); ok && out != os.Stdout {
+		closer.Close()
+	}
+	return nil
+}
+
+func checkFileExtraScans(resolved string, data []byte, ext string, opts checkOptions) {
 	if !opts.noSecrets {
 		scanAndWriteSecrets(resolved, data, opts.format)
 	}
@@ -453,14 +484,6 @@ func checkFile(path string, opts checkOptions, diffRanges ...git.LineRange) erro
 			writeMetaLintFindings(opts.format, mlFindings)
 		}
 	}
-
-	if opts.estimateTokens {
-		estimator := analyzer.NewTokenEstimator(resolved, result.Score)
-		fmt.Print("\n" + estimator.FormatEstimateOutput())
-	}
-
-	telemetry.RecordDuration("check_file", lang, time.Since(start).Seconds())
-	return nil
 }
 
 // diffModeAnnotate filters a quality result to only show smells in the
@@ -481,32 +504,7 @@ func checkDirectory(dir string, opts checkOptions, respectGitignore bool) error 
 		return err
 	}
 
-	scanQuality := !opts.secretsOnly && !opts.vulnerabilitiesOnly    // gitleaks:allow
-	scanSecrets := !opts.noSecrets || opts.secretsOnly               // gitleaks:allow
-	scanVulns := !opts.noVulnerabilities || opts.vulnerabilitiesOnly // gitleaks:allow
-
-	configDir := config.FindConfigDir(resolvedDir)
-	ctx := &walkContext{
-		opts:          opts,
-		resolvedDir:   resolvedDir,
-		gitignorePats: nil,
-		excludePats:   config.LoadExcludedFiles(resolvedDir),
-		configDir:     configDir,
-		scanQuality:   scanQuality,
-		scanner:       nil,
-		vulnScanner:   nil,
-		langCount:     make(map[string]int),
-		outputPath:    opts.outputPath,
-	}
-	if respectGitignore {
-		ctx.gitignorePats = loadGitignore(resolvedDir)
-	}
-	if scanSecrets {
-		ctx.scanner, _ = secrets.NewScanner()
-	}
-	if scanVulns {
-		ctx.vulnScanner = vulnerability.NewScanner()
-	}
+	ctx := makeWalkContext(resolvedDir, opts, respectGitignore, false, "", nil)
 
 	err = filepath.WalkDir(resolvedDir, ctx.walkFn)
 	if err != nil {
@@ -518,7 +516,6 @@ func checkDirectory(dir string, opts checkOptions, respectGitignore bool) error 
 		ctx.writeResults()
 	}
 	if opts.metaLint {
-		// Run meta-linters on the directory (Go mode)
 		mlFindings, err := metalinter.LintGo([]string{resolvedDir})
 		if err == nil && len(mlFindings) > 0 {
 			if !opts.quiet {

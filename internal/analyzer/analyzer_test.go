@@ -6,6 +6,23 @@ import (
 	"github.com/ailinter/ailinter/internal/analyzer"
 )
 
+func analyzeTest(src string) analyzer.QualityResult {
+	return analyzer.Analyze(
+		analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"},
+		analyzer.DefaultThresholds("go"),
+	)
+}
+
+func assertSmellDetected(t *testing.T, result analyzer.QualityResult, smellName string) bool {
+	t.Helper()
+	for _, s := range result.Smells {
+		if s.Name == smellName {
+			return true
+		}
+	}
+	return false
+}
+
 func TestQualityScore_HealthyFile(t *testing.T) {
 	src := `package main
 
@@ -16,12 +33,9 @@ func Greet(name string) string {
 	return "Hello, " + name + "!"
 }
 `
-	result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
+	result := analyzeTest(src)
 	if result.Score < 95 {
 		t.Errorf("healthy file should score >= 95, got %d", result.Score)
-	}
-	if len(result.Smells) > 0 {
-		t.Logf("smells on healthy file: %v", result.Smells)
 	}
 }
 
@@ -43,40 +57,20 @@ func DeepNested(data *Data) error {
 	return nil
 }
 `
-	result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
-	t.Logf("Score: %d, Smells: %d", result.Score, len(result.Smells))
-	for _, s := range result.Smells {
-		t.Logf("  [%s] %s", s.Severity, s.Name)
-	}
-	found := false
-	for _, s := range result.Smells {
-		if s.Name == "deep_nesting" {
-			found = true
-			break
-		}
-	}
-	if !found {
+	result := analyzeTest(src)
+	if !assertSmellDetected(t, result, "deep_nesting") {
 		t.Error("expected deep_nesting smell, not found")
 	}
 }
 
 func TestBrainMethod_Detected(t *testing.T) {
-	lines := 90
 	src := "package main\nfunc LongFunc() {\n"
-	for i := 0; i < lines; i++ {
+	for i := 0; i < 90; i++ {
 		src += "\t_ = " + string(rune('a'+i%26)) + "\n"
 	}
 	src += "}\n"
-
-	result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
-	found := false
-	for _, s := range result.Smells {
-		if s.Name == "brain_method" {
-			found = true
-			break
-		}
-	}
-	if !found {
+	result := analyzeTest(src)
+	if !assertSmellDetected(t, result, "brain_method") {
 		t.Error("expected brain_method smell for 90-line function, not found")
 	}
 }
@@ -86,16 +80,9 @@ func TestFileBloat_Detected(t *testing.T) {
 	for i := 0; i < 1100; i++ {
 		src += "var x" + string(rune('a'+i%26)) + " = 1\n"
 	}
-	result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
-	found := false
-	for _, s := range result.Smells {
-		if s.Name == "file_bloat" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("expected file_bloat smell for 1100-line file, not found")
+	result := analyzeTest(src)
+	if !assertSmellDetected(t, result, "file_bloat") {
+		t.Error("expected file_bloat smell", nil)
 	}
 }
 
@@ -109,15 +96,8 @@ func IsEligible(user *User) bool {
 	return false
 }
 `
-	result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
-	found := false
-	for _, s := range result.Smells {
-		if s.Name == "complex_conditional" {
-			found = true
-			break
-		}
-	}
-	if !found {
+	result := analyzeTest(src)
+	if !assertSmellDetected(t, result, "complex_conditional") {
 		t.Error("expected complex_conditional smell, not found")
 	}
 }
@@ -136,7 +116,6 @@ func TwoBumps(items []int) int {
 			}
 		}
 	}
-	// surface
 	for _, it := range items {
 		if it < 0 {
 			if it > -100 {
@@ -149,28 +128,15 @@ func TwoBumps(items []int) int {
 	return c
 }
 `
-	result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
-	t.Logf("Score: %d, Smells: %d", result.Score, len(result.Smells))
-	for _, s := range result.Smells {
-		t.Logf("  [%s] %s: %s", s.Severity, s.Name, s.Message)
+	result := analyzeTest(src)
+	if assertSmellDetected(t, result, "bumpy_road") {
+		return
 	}
-	found := false
-	for _, s := range result.Smells {
-		if s.Name == "bumpy_road" {
-			found = true
-			break
-		}
+	if assertSmellDetected(t, result, "deep_nesting") {
+		t.Log("bumpy_road not detected but deep_nesting was — acceptable")
+		return
 	}
-	// Accept if bumpy_road or deep_nesting (both indicate the nested structure was recognized)
-	if !found {
-		for _, s := range result.Smells {
-			if s.Name == "deep_nesting" {
-				t.Log("bumpy_road not detected but deep_nesting was — acceptable (nested structure recognized)")
-				return
-			}
-		}
-		t.Error("expected bumpy_road or deep_nesting smell, neither found")
-	}
+	t.Error("expected bumpy_road or deep_nesting smell, neither found")
 }
 
 func TestDuplication_Detected(t *testing.T) {
@@ -200,24 +166,13 @@ func ProcessB(data []int) int {
 	return s
 }
 `
-	result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
-	for _, s := range result.Smells {
-		t.Logf("  [%s] %s: %s", s.Severity, s.Name, s.Message)
-	}
-	found := false
-	for _, s := range result.Smells {
-		if s.Name == "code_duplication" {
-			found = true
-			break
-		}
-	}
-	if !found {
+	result := analyzeTest(src)
+	if !assertSmellDetected(t, result, "code_duplication") {
 		t.Error("expected code_duplication smell for identical functions, not found")
 	}
 }
 
 func TestCyclomaticComplexity_Detected(t *testing.T) {
-	// Need CC >= 9 to exceed warning threshold for Go
 	src := `package main
 
 func ComplexFunc(x int) string {
@@ -236,16 +191,11 @@ func ComplexFunc(x int) string {
 	return "zero"
 }
 `
-	result := analyzer.Analyze(analyzer.SourceInput{FilePath: "test.go", Source: src, Lang: "go"}, analyzer.DefaultThresholds("go"))
-	t.Logf("Score: %d, Smells: %d", result.Score, len(result.Smells))
-	found := false
+	result := analyzeTest(src)
 	for _, s := range result.Smells {
 		t.Logf("  [%s] %s: %s", s.Severity, s.Name, s.Message)
-		if s.Name == "complex_method" {
-			found = true
-		}
 	}
-	if !found {
+	if !assertSmellDetected(t, result, "complex_method") {
 		t.Error("expected complex_method smell, not found")
 	}
 }
