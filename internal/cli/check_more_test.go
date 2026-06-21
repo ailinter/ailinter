@@ -175,9 +175,9 @@ func TestWriteMetaLintFindings(t *testing.T) {
 
 func TestWriteMarkdownMetaLint(t *testing.T) {
 	for _, tt := range []struct {
-		name     string
-		findings []metalinter.Finding
-		checks   []string
+		name       string
+		findings   []metalinter.Finding
+		checks     []string
 		antiChecks []string
 	}{
 		{
@@ -238,9 +238,9 @@ func TestWriteMarkdownMetaLint(t *testing.T) {
 
 func TestWriteHumanMetaLint(t *testing.T) {
 	for _, tt := range []struct {
-		name     string
-		findings []metalinter.Finding
-		checks   []string
+		name       string
+		findings   []metalinter.Finding
+		checks     []string
 		antiChecks []string
 	}{
 		{
@@ -561,9 +561,9 @@ func TestCheckFile_QuietMode(t *testing.T) {
 
 func TestCheckDirectory_QuietMode(t *testing.T) {
 	for _, tt := range []struct {
-		name     string
-		files    map[string]string
-		opts     checkOptions
+		name  string
+		files map[string]string
+		opts  checkOptions
 	}{
 		{
 			"suppresses all output",

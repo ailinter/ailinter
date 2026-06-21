@@ -12,12 +12,12 @@ import (
 
 // reportTestBuilder helps build ReportData instances without long parameter lists.
 type reportTestBuilder struct {
-	target       string
-	score        int
-	label        string
-	results      []analyzer.QualityResult
-	secrets      []secrets.SecretFinding
-	vulns        []vulnerability.Finding
+	target  string
+	score   int
+	label   string
+	results []analyzer.QualityResult
+	secrets []secrets.SecretFinding
+	vulns   []vulnerability.Finding
 }
 
 func (b reportTestBuilder) build() *analyzer.ReportData {
@@ -275,7 +275,7 @@ func TestRenderMarkdown_WithVulnerabilities(t *testing.T) {
 	rd := reportTestBuilder{
 		target: "/test/main.go", score: 80, label: "Go Ahead",
 		results: []analyzer.QualityResult{{Score: 80, Label: "Go Ahead", FilePath: "/test/main.go", Language: "go", LinesOfCode: 30}},
-		vulns: []vulnerability.Finding{{Category: "injection", RuleID: "eval_injection", Severity: "critical", Line: 15}},
+		vulns:   []vulnerability.Finding{{Category: "injection", RuleID: "eval_injection", Severity: "critical", Line: 15}},
 	}.build()
 	md := rd.RenderMarkdown()
 	assertContains(t, md, "1 vulnerability pattern(s) detected")
