@@ -26,7 +26,20 @@ AILINTER scans your code for quality issues, hardcoded secrets, and vulnerabilit
   · <a href="https://github.com/ailinter/ailinter/blob/main/CONTRIBUTING.md">Contributing</a>
 </p>
 
+### Who Is AILINTER For?
+
+| Persona | Problem | How AILINTER Helps |
+|---------|---------|-------------------|
+| 🧑‍💻 **Solo Developer** | AI writes bad code, you don't catch it all | Quick pre-commit safety net — one command scans every AI-generated change |
+| 👥 **Team Lead** | AI tooling varies across the team — Copilot, Claude, Cursor, etc. | Unified MCP server works with ALL agents. Single config, consistent quality bar. |
+| 🔒 **Security Engineer** | Secrets bleeding into AI-generated templates | 269+ rule secret scanning with full redaction — AI never sees the raw secret |
+| 🏢 **Enterprise** | Enforce code quality gates across every AI PR | Diff-aware scanning (`--diff main`), SARIF for GitHub Code Scanning, CI-ready |
+| 📦 **OSS Maintainer** | Influx of AI-written PRs degrading codebase | Automated quality checks catch regressions before merge |
+| 🛠️ **Platform Team** | Need to embed safety checks into existing MCP infrastructure | Native MCP server — plug into any MCP-compatible IDE, agent, or pipeline |
+
 ---
+
+
 
 ## Install in 30 Seconds
 
@@ -138,6 +151,24 @@ AILINTER is a native MCP (Model Context Protocol) server. Add it to any MCP-comp
 Works with **Claude Code, Cursor, OpenCode, Windsurf, Continue.dev, Cline, GitHub Copilot**, and any MCP-compatible agent.
 
 > **One command to set them all:** `ailinter init --agent all` generates configs for every supported agent at once.
+
+### How It Compares
+
+| Feature | **AILINTER** | Gitleaks | Semgrep | Trivy | SonarQube |
+|---------|:-----------:|:--------:|:-------:|:-----:|:---------:|
+| Secret scanning (269+ rules) | ✅ | ✅ | ⚠️ (community) | ⚠️ (basic) | ❌ |
+| Code quality scoring (0–100) | ✅ | ❌ | ✅ | ❌ | ✅ |
+| 58 vulnerability patterns | ✅ | ❌ | ✅ | ✅ | ✅ |
+| MCP-native (7 tools) | ✅ | ❌ | ❌ | ❌ | ❌ |
+| VS Code extension | ✅ | ❌ | ⚠️ (3rd-party) | ❌ | ❌ |
+| AI modification safety checks | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Go metalinters (vet, staticcheck, etc.) | ✅ | ❌ | ⚠️ (via rules) | ❌ | ✅ |
+| SARIF output | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Single 30 MB binary | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Zero deps, no runtime required | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Open source (MIT) | ✅ | ✅ | ✅ | ✅ | ⚠️ (LGPL/Commercial) |
+
+> **Bottom line:** AILINTER is the only tool designed specifically for the AI-assisted development workflow — not just a linter, not just a secret scanner, but a complete safety visor that understands how AIs modify code.
 
 ### CI/CD Integration
 
@@ -311,6 +342,15 @@ make release     # Cross-platform binaries (5 targets)
 We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code standards, and the contribution workflow. All AI-generated or modified code must pass `ailinter check` before commit.
 
 **Small PRs, high quality.**
+
+---
+
+**AILINTER** is a project by [Ivan Bernikov](https://github.com/IvanBern).
+
+- 🌟 [Star on GitHub](https://github.com/ailinter/ailinter) — it helps other devs find the project
+- 🐦 [Follow @ailinter_dev](https://x.com/ailinter_dev)
+- 🌐 [ailinter.dev](https://ailinter.dev/)
+- 💬 [Open an issue](https://github.com/ailinter/ailinter/issues/new)
 
 ---
 
