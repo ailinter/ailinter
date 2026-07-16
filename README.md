@@ -67,6 +67,8 @@ ailinter mcp                              # Start MCP server for AI assistants
 
 **30 seconds to install. Zero configuration required. No signup. No telemetry by default. MIT licensed.**
 
+> **Save time, not code.** Run `ailinter check .` before every AI-assisted commit.
+
 ---
 
 ## Features
