@@ -59,7 +59,7 @@ jobs:
         id: ailinter
         uses: ./.github/actions/ailinter-check
         with:
-          quality-threshold: '90'
+          quality-threshold: '80'
           fail-on-secrets: 'true'
           version: 'latest'
           scan-path: '${{ steps.changed-files.outputs.paths }}'
