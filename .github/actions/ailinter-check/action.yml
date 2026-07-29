@@ -130,11 +130,14 @@ runs:
         echo "Scanning: ${{ inputs.scan-path }}"
         echo ""
 
-        ailinter check ${{ inputs.scan-path }} \
-          --format problems \
-          --no-secrets \
-          --no-vulnerabilities \
-          2>&1 | tee /tmp/ailinter-quality.txt
+        # Run ailinter check per-file (binary accepts only 1 path at a time)
+        for f in ${{ inputs.scan-path }}; do
+          ailinter check "$f" \
+            --format problems \
+            --no-secrets \
+            --no-vulnerabilities \
+            2>&1 | tee -a /tmp/ailinter-quality.txt
+        done
 
         echo "::endgroup::"
 
@@ -150,10 +153,13 @@ runs:
         echo "Scanning: ${{ inputs.scan-path }}"
         echo ""
 
-        ailinter check ${{ inputs.scan-path }} \
-          --secrets-only \
-          --format problems \
-          2>&1 | tee /tmp/ailinter-secrets.txt
+        # Run ailinter check per-file (binary accepts only 1 path at a time)
+        for f in ${{ inputs.scan-path }}; do
+          ailinter check "$f" \
+            --secrets-only \
+            --format problems \
+            2>&1 | tee -a /tmp/ailinter-secrets.txt
+        done
 
         echo "::endgroup::"
 
@@ -164,8 +170,6 @@ runs:
       id: extract-results
       shell: bash
       run: |
-        set -euo pipefail
-
         LOWEST=100
         ISSUES=0
         SECRETS=0
@@ -182,29 +186,28 @@ runs:
           done < /tmp/ailinter-quality.txt
 
           # Count findings (lines with file:line:col: pattern)
-          ISSUES=$(grep -cE '^[^#]+\.[a-z]+:[0-9]+:[0-9]+:' \
-            /tmp/ailinter-quality.txt 2>/dev/null || echo 0)
+          ISSUES=$(grep -cE '^[^#]+\.[a-z]+:[0-9]+:[0-9]+:' /tmp/ailinter-quality.txt 2>/dev/null || echo "0")
         fi
 
         # ---- secrets count ----
         if [ -f /tmp/ailinter-secrets.txt ]; then
-          SECRETS=$(grep -cE '^[^#]+\.[a-z]+:[0-9]+:[0-9]+:' \
-            /tmp/ailinter-secrets.txt 2>/dev/null || echo 0)
+          SECRETS=$(grep -cE '^[^#]+\.[a-z]+:[0-9]+:[0-9]+:' /tmp/ailinter-secrets.txt 2>/dev/null || echo "0")
         fi
 
-        echo "quality-score=$LOWEST"    >> "$GITHUB_OUTPUT"
-        echo "issues-found=$ISSUES"     >> "$GITHUB_OUTPUT"
-        echo "secrets-found=$SECRETS"   >> "$GITHUB_OUTPUT"
+        # Write outputs — use tee to /dev/null to prevent any echo leakage
+        echo "quality-score=${LOWEST}"    >> "${GITHUB_OUTPUT}"
+        echo "issues-found=${ISSUES}"     >> "${GITHUB_OUTPUT}"
+        echo "secrets-found=${SECRETS}"   >> "${GITHUB_OUTPUT}"
 
         # Print summary to workflow log
         echo ""
         echo "╔══════════════════════════════════════════╗"
         echo "║      AILINTER — Results Summary          ║"
         echo "╠══════════════════════════════════════════╣"
-        printf "║  %-38s ║\n" "Lowest quality score : ${LOWEST}/100"
-        printf "║  %-38s ║\n" "Quality threshold   : ${{ inputs.quality-threshold }}/100"
-        printf "║  %-38s ║\n" "Code quality issues : ${ISSUES}"
-        printf "║  %-38s ║\n" "Secrets detected    : ${SECRETS}"
+        printf '║  %-38s ║\n' "Lowest quality score : ${LOWEST}/100"
+        printf '║  %-38s ║\n' "Quality threshold   : ${{ inputs.quality-threshold }}/100"
+        printf '║  %-38s ║\n' "Code quality issues : ${ISSUES}"
+        printf '║  %-38s ║\n' "Secrets detected    : ${SECRETS}"
         echo "╚══════════════════════════════════════════╝"
 
     # ------------------------------------------------------------------
