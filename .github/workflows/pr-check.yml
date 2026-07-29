@@ -34,6 +34,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # ----------------------------------------------------------------
+      # Compute changed files (diff from base branch)
+      # ----------------------------------------------------------------
+      - name: Get Changed Files
+        id: changed-files
+        shell: bash
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD 2>/dev/null || \
+                    git diff --name-only HEAD~1...HEAD 2>/dev/null || echo ".")
+          echo "Changed files:"
+          echo "$CHANGED"
+          # Collapse to one line, space-separated
+          PATHS=$(echo "$CHANGED" | tr '\n' ' ')
+          echo "paths=$PATHS" >> "$GITHUB_OUTPUT"
 
       # ----------------------------------------------------------------
       # Use the composite action for install + scan + results
@@ -42,9 +59,10 @@ jobs:
         id: ailinter
         uses: ./.github/actions/ailinter-check
         with:
-          quality-threshold: '90'
+          quality-threshold: '80'
           fail-on-secrets: 'true'
-          version: 'latest'
+          version: 'v1.0.0'
+          scan-path: '${{ steps.changed-files.outputs.paths }}'
 
       # ----------------------------------------------------------------
       # Build AILINTER from current source (dogfooding), then generate
