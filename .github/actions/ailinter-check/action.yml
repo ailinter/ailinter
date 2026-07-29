@@ -68,6 +68,7 @@ runs:
         if [ "$VERSION" = "latest" ]; then
           echo "⚡ Resolving latest AILINTER release…"
           API_RESP=$(curl -sSL --retry 3 \
+            -H "Authorization: Bearer ${{ github.token }}" \
             https://api.github.com/repos/ailinter/ailinter/releases/latest)
           VERSION=$(printf '%s' "$API_RESP" | python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))")
           if [ -z "$VERSION" ]; then

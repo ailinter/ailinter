@@ -61,7 +61,7 @@ jobs:
         with:
           quality-threshold: '80'
           fail-on-secrets: 'true'
-          version: 'latest'
+          version: 'v1.0.0'
           scan-path: '${{ steps.changed-files.outputs.paths }}'
 
       # ----------------------------------------------------------------
