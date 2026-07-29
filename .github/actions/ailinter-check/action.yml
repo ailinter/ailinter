@@ -137,7 +137,6 @@ runs:
           2>&1 | tee /tmp/ailinter-quality.txt
 
         echo "::endgroup::"
-        echo "exitcode=$?" >> "$GITHUB_OUTPUT"
 
     # ------------------------------------------------------------------
     # 3. Run secret scan
@@ -157,7 +156,6 @@ runs:
           2>&1 | tee /tmp/ailinter-secrets.txt
 
         echo "::endgroup::"
-        echo "exitcode=$?" >> "$GITHUB_OUTPUT"
 
     # ------------------------------------------------------------------
     # 4. Parse results and set action outputs
