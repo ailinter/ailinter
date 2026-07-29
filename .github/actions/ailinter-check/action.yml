@@ -131,12 +131,17 @@ runs:
         echo ""
 
         # Run ailinter check per-file (binary accepts only 1 path at a time)
+        # Only check .go files — other types cause govet errors
         for f in ${{ inputs.scan-path }}; do
-          ailinter check "$f" \
-            --format problems \
-            --no-secrets \
-            --no-vulnerabilities \
-            2>&1 | tee -a /tmp/ailinter-quality.txt
+          case "$f" in
+            *.go)
+              ailinter check "$f" \
+                --format problems \
+                --no-secrets \
+                --no-vulnerabilities \
+                2>&1 | tee -a /tmp/ailinter-quality.txt
+              ;;
+          esac
         done
 
         echo "::endgroup::"
