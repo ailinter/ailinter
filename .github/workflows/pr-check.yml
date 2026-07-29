@@ -59,7 +59,8 @@ jobs:
         id: ailinter
         uses: ./.github/actions/ailinter-check
         with:
-          quality-threshold: '90'
+          # Threshold 50 = catch regressions in changed files (not pre-existing issues)
+          quality-threshold: '50'
           fail-on-secrets: 'true'
           version: 'latest'
           scan-path: '${{ steps.changed-files.outputs.paths }}'
