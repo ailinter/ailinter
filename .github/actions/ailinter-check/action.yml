@@ -130,7 +130,7 @@ runs:
         echo "Scanning: ${{ inputs.scan-path }}"
         echo ""
 
-        ailinter check "${{ inputs.scan-path }}" \
+        ailinter check ${{ inputs.scan-path }} \
           --format problems \
           --no-secrets \
           --no-vulnerabilities \
@@ -151,7 +151,7 @@ runs:
         echo "Scanning: ${{ inputs.scan-path }}"
         echo ""
 
-        ailinter check "${{ inputs.scan-path }}" \
+        ailinter check ${{ inputs.scan-path }} \
           --secrets-only \
           --format problems \
           2>&1 | tee /tmp/ailinter-secrets.txt
