@@ -14,6 +14,8 @@
 [![VS Code](https://img.shields.io/badge/VS_Code-Extension-007ACC?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=ailinter.ailinter)
 [![SecretBench](https://img.shields.io/badge/SecretBench-203%25_recall_vs_Gitleaks-7c3aed)](https://github.com/ailinter/ailinter#benchmarks)
 [![SARIF](https://img.shields.io/badge/SARIF-v2.1.0-0078D7)](https://docs.oasis-open.org/sarif/sarif/v2.1.0/)
+[![CI](https://github.com/ailinter/ailinter/workflows/CI/badge.svg)](https://github.com/ailinter/ailinter/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/ailinter/ailinter/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/ailinter/ailinter/actions)
 
 **One 30 MB binary. 269+ secret rules. 58 vulnerability patterns. 20 quality detectors. 7 MCP tools. VS Code extension. Zero dependencies.**
 
