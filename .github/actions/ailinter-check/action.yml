@@ -191,12 +191,12 @@ runs:
           done < /tmp/ailinter-quality.txt
 
           # Count findings (lines with file:line:col: pattern)
-          ISSUES=$(grep -cE '^[^#]+\.[a-z]+:[0-9]+:[0-9]+:' /tmp/ailinter-quality.txt 2>/dev/null || echo "0")
+          ISSUES=$(grep -cE '^[^#]+\.[a-z]+:[0-9]+:[0-9]+:' /tmp/ailinter-quality.txt 2>/dev/null) || ISSUES=0
         fi
 
         # ---- secrets count ----
         if [ -f /tmp/ailinter-secrets.txt ]; then
-          SECRETS=$(grep -cE '^[^#]+\.[a-z]+:[0-9]+:[0-9]+:' /tmp/ailinter-secrets.txt 2>/dev/null || echo "0")
+          SECRETS=$(grep -cE '^[^#]+\.[a-z]+:[0-9]+:[0-9]+:' /tmp/ailinter-secrets.txt 2>/dev/null) || SECRETS=0
         fi
 
         # Write outputs — use tee to /dev/null to prevent any echo leakage
