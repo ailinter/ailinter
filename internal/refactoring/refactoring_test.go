@@ -168,3 +168,81 @@ func TestLookup_LongMethod(t *testing.T) {
 		t.Error("expected Brain Method reference in alias pattern")
 	}
 }
+
+func TestLookup_InputValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		smell       string
+		wantNil     bool
+		contentHint string
+	}{
+		{
+			name:        "known pattern",
+			smell:       "deep_nesting",
+			contentHint: "Guard Clauses",
+		},
+		{
+			name:    "empty name",
+			smell:   "",
+			wantNil: true,
+		},
+		{
+			name:    "unsupported name",
+			smell:   "unsupported_language",
+			wantNil: true,
+		},
+		{
+			name:    "markdown filename",
+			smell:   "deep_nesting.md",
+			wantNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pattern := refactoring.Lookup(tt.smell)
+			if tt.wantNil {
+				if pattern != nil {
+					t.Fatalf("Lookup(%q) = %#v, want nil", tt.smell, pattern)
+				}
+				return
+			}
+			if pattern == nil {
+				t.Fatalf("Lookup(%q) returned nil", tt.smell)
+			}
+			if !strings.Contains(pattern.Content, tt.contentHint) {
+				t.Errorf("Lookup(%q) content does not contain %q", tt.smell, tt.contentHint)
+			}
+		})
+	}
+}
+
+func TestListPatterns_EmbeddedPatterns(t *testing.T) {
+	names := refactoring.ListPatterns()
+	if len(names) == 0 {
+		t.Fatal("ListPatterns returned no patterns")
+	}
+
+	seen := make(map[string]bool, len(names))
+	for _, name := range names {
+		if name == "" {
+			t.Error("ListPatterns returned an empty pattern name")
+		}
+		if seen[name] {
+			t.Errorf("ListPatterns returned duplicate name %q", name)
+		}
+		seen[name] = true
+
+		pattern := refactoring.Lookup(name)
+		if pattern == nil {
+			t.Errorf("ListPatterns returned %q, but Lookup could not find it", name)
+			continue
+		}
+		if pattern.Name != name {
+			t.Errorf("Lookup(%q).Name = %q", name, pattern.Name)
+		}
+		if strings.TrimSpace(pattern.Content) == "" {
+			t.Errorf("pattern %q has empty content", name)
+		}
+	}
+}
