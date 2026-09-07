@@ -31,7 +31,10 @@ jobs:
           fmt=$(go fmt ./...)
           if [ -n "$fmt" ]; then echo "$fmt"; exit 1; fi
       - name: Install staticcheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+        # Pinned: @latest (v0.8.x) requires go >= 1.26, runner is go 1.25.14.
+        # v0.7.0 pairs with go 1.25.x. Bump together with setup-go when the
+        # toolchain moves to 1.26+.
+        run: go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
       - name: staticcheck
         run: staticcheck ./...
 
