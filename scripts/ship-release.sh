@@ -29,6 +29,11 @@ fi
 
 cd "$(git rev-parse --show-toplevel)"
 
+if [ "$(git branch --show-current)" != "main" ]; then
+  echo "X must run from the main branch (on: $(git branch --show-current))" >&2
+  exit 1
+fi
+
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "X working tree dirty - commit or stash first" >&2
   exit 1

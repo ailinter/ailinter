@@ -16,15 +16,18 @@
 
 set -uo pipefail
 
-ZERO=0000000000000000000000000000000000000000
-
 # --- 1. PR-only trunk enforcement -----------------------------------------
+# Blocks any write to refs/heads/main — direct pushes AND deletions (a delete
+# arrives as local_sha == zeros). Non-main ref deletes/updates are allowed.
 while read local_ref local_sha remote_ref remote_sha; do
-  [ "$local_sha" = "$ZERO" ] && continue   # deleting a ref — always allow
   case "$remote_ref" in
     refs/heads/main)
-      echo "X Direct push to main blocked (PR-only policy)." >&2
-      echo "  Create a short-lived branch and open a PR - CI + review run there." >&2
+      if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+        echo "X Deleting main is blocked (PR-only policy)." >&2
+      else
+        echo "X Direct push to main blocked (PR-only policy)." >&2
+        echo "  Create a short-lived branch and open a PR - CI + review run there." >&2
+      fi
       exit 1
       ;;
   esac
