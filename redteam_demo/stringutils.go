@@ -24,23 +24,21 @@ func ToUpper(s string) string {
 }
 
 // ContainsAny reports whether s contains any character present in chars.
+//
+// It builds a set of the runes in chars (O(len(chars))) and scans s
+// rune-by-rune (O(len(s))), so distinct runes that share bytes (é U+00E9 vs
+// è U+00E8) never match. Invalid UTF-8 decodes to RuneError on both sides,
+// mirroring strings.ContainsAny without panicking.
 func ContainsAny(s, chars string) bool {
 	if len(s) == 0 || chars == "" {
 		return false
 	}
-	// Build a set of the runes in chars: O(len(chars)).
-	// Scanning s rune-by-rune makes matching O(len(s)) and Unicode-correct:
-	// distinct runes sharing a byte (é U+00E9 vs è U+00E8) no longer match.
-	// Invalid UTF-8 decodes to RuneError on both sides, mirroring
-	// strings.ContainsAny without panicking.
-	set := make(map[rune]struct{}, utf8.RuneCountInString(chars))
-	for len(chars) > 0 {
-		r, size := utf8.DecodeRuneInString(chars)
-		set[r] = struct{}{}
-		chars = chars[size:]
+	set := make(map[rune]bool, utf8.RuneCountInString(chars))
+	for _, r := range chars {
+		set[r] = true
 	}
 	for _, r := range s {
-		if _, ok := set[r]; ok {
+		if set[r] {
 			return true
 		}
 	}

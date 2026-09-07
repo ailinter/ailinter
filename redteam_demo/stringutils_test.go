@@ -36,12 +36,20 @@ func TestToUpper(t *testing.T) {
 	}
 }
 
-func TestContainsAny(t *testing.T) {
-	cases := []struct {
-		name     string
-		s, chars string
-		want     bool
-	}{
+// containsAnyCase is one row of the ContainsAny corpus: a substring s, a
+// chars set, and the membership result ContainsAny must report.
+type containsAnyCase struct {
+	name     string
+	s, chars string
+	want     bool
+}
+
+// containsAnyCases returns the rune-matching corpus exercised by
+// TestContainsAny and assertContainsAny.
+func containsAnyCases() []containsAnyCase {
+	// Corpus for TestContainsAny: ContainsAny must agree with
+	// strings.ContainsAny on every row, including byte-sharing runes.
+	return []containsAnyCase{
 		{"ascii-present", "hello", "aeiou", true},
 		{"ascii-absent", "hello", "xyz", false},
 		{"single-rune", "hello", "h", true},
@@ -59,12 +67,22 @@ func TestContainsAny(t *testing.T) {
 		{"emoji-same", "🙂", "🙂", true},
 		{"invalid-utf8-no-match", "\xff", "a", false},
 	}
-	for _, c := range cases {
+}
+
+func TestContainsAny(t *testing.T) {
+	// Run every ContainsAny corpus row as its own subtest.
+	for _, c := range containsAnyCases() {
 		t.Run(c.name, func(t *testing.T) {
-			if got := ContainsAny(c.s, c.chars); got != c.want {
-				t.Errorf("ContainsAny(%q, %q) = %v, want %v", c.s, c.chars, got, c.want)
-			}
+			assertContainsAny(t, c)
 		})
+	}
+}
+
+// assertContainsAny reports a subtest failure when the row mismatches.
+func assertContainsAny(t *testing.T, c containsAnyCase) {
+	// Spot-check the hardened path: ContainsAny must equal c.want for this row.
+	if got := ContainsAny(c.s, c.chars); got != c.want {
+		t.Errorf("ContainsAny(%q, %q) = %v, want %v", c.s, c.chars, got, c.want)
 	}
 }
 
@@ -92,19 +110,30 @@ func TestContainsAnyMatchesStrings(t *testing.T) {
 	}
 }
 
-func TestMaxLen(t *testing.T) {
-	cases := []struct {
-		s    string
-		max  int
-		want string
-	}{
+// maxLenCase is one row of the MaxLen corpus: an input string, a byte budget,
+// and the truncated result MaxLen must return.
+type maxLenCase struct {
+	s    string
+	max  int
+	want string
+}
+
+// maxLenCases returns the truncation corpus for TestMaxLen.
+func maxLenCases() []maxLenCase {
+	// Rows exercised by TestMaxLen and TestMaxLenPanicsOnNegative. MaxLen
+	// must truncate each row to its byte budget.
+	return []maxLenCase{
 		{"hello", 10, "hello"},
 		{"hello", 5, "hello"},
 		{"hello", 3, "hel"},
 		{"", 0, ""},
 		{"abcdef", 0, ""},
 	}
-	for _, c := range cases {
+}
+
+func TestMaxLen(t *testing.T) {
+	// MaxLen must truncate every corpus row to its byte budget.
+	for _, c := range maxLenCases() {
 		if got := MaxLen(c.s, c.max); got != c.want {
 			t.Errorf("MaxLen(%q, %d) = %q, want %q", c.s, c.max, got, c.want)
 		}
