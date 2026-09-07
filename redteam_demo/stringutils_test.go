@@ -3,6 +3,7 @@ package stringutils
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestReverse(t *testing.T) {
@@ -12,6 +13,11 @@ func TestReverse(t *testing.T) {
 		{"abc", "cba"},
 		{"hello world", "dlrow olleh"},
 		{"12345", "54321"},
+		// Multi-byte: runes must reverse whole, result stays valid UTF-8.
+		{"café", "éfac"},
+		{"日本語", "語本日"},
+		{"🙂ok", "ko🙂"},
+		{"aé日", "日éa"},
 	}
 	for _, c := range cases {
 		if got := Reverse(c.in); got != c.want {
@@ -128,6 +134,13 @@ func maxLenCases() []maxLenCase {
 		{"hello", 3, "hel"},
 		{"", 0, ""},
 		{"abcdef", 0, ""},
+		// Byte budgets that cut through multi-byte runes must back off to a
+		// rune boundary — the result is always valid UTF-8.
+		{"日本語", 9, "日本語"}, // len == 9, unchanged
+		{"日本語", 8, "日本"},  // 語 is 3 bytes; 8 cuts it → back to 6
+		{"日本語", 3, "日"},   // boundary at 3
+		{"日本語", 2, ""},    // 2 < 日(3B) → nothing fits
+		{"aé", 2, "a"},    // é is 2 bytes (0xc3 0xa9); 2 cuts it → back to 1
 	}
 }
 
@@ -147,4 +160,21 @@ func TestMaxLenPanicsOnNegative(t *testing.T) {
 		}
 	}()
 	MaxLen("x", -1)
+}
+
+// TestMaxLenReturnsValidUTF8 pins the rune-boundary guarantee: for any input
+// and byte budget, the result must be valid UTF-8 when the input is.
+func TestMaxLenReturnsValidUTF8(t *testing.T) {
+	inputs := []string{"", "hello", "café", "日本語", "🙂ok", "a\xc3\xa9b日"}
+	for _, s := range inputs {
+		for max := 0; max <= len(s)+1; max++ {
+			got := MaxLen(s, max)
+			if !utf8.ValidString(got) {
+				t.Errorf("MaxLen(%q, %d) = %q — invalid UTF-8", s, max, got)
+			}
+			if len(got) > max {
+				t.Errorf("MaxLen(%q, %d) = %q — %d bytes > budget", s, max, got, len(got))
+			}
+		}
+	}
 }

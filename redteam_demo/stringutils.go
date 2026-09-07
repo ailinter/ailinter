@@ -3,13 +3,16 @@ package stringutils
 
 import "unicode/utf8"
 
-// Reverse returns s with its bytes in reverse order.
+// Reverse returns s with its characters in reverse order. It operates on
+// runes, so multi-byte characters (é, 日, 🙂) are reversed whole and the
+// result is always valid UTF-8 for valid-UTF-8 input. Invalid bytes decode
+// to RuneError, mirroring the package's rune-based contract.
 func Reverse(s string) string {
-	b := []byte(s)
-	for i, j := 0, len(b)-1; i < j; i, j = i+1, j-1 {
-		b[i], b[j] = b[j], b[i]
+	r := []rune(s)
+	for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {
+		r[i], r[j] = r[j], r[i]
 	}
-	return string(b)
+	return string(r)
 }
 
 // ToUpper returns s with ASCII letters uppercased; non-ASCII bytes are left unchanged.
@@ -45,8 +48,10 @@ func ContainsAny(s, chars string) bool {
 	return false
 }
 
-// MaxLen returns s truncated to at most max bytes, or s unchanged if len(s) <= max.
-// It panics if max is negative.
+// MaxLen returns s truncated to at most max bytes. If the byte budget cuts
+// through a multi-byte rune, the result backs off to the nearest rune
+// boundary, so the returned string is always valid UTF-8. s is returned
+// unchanged when len(s) <= max. It panics if max is negative.
 func MaxLen(s string, max int) string {
 	if max < 0 {
 		panic("stringutils.MaxLen: max must not be negative")
@@ -54,5 +59,9 @@ func MaxLen(s string, max int) string {
 	if len(s) <= max {
 		return s
 	}
-	return s[:max]
+	end := max
+	for end > 0 && !utf8.RuneStart(s[end]) {
+		end--
+	}
+	return s[:end]
 }
