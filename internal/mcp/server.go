@@ -83,7 +83,7 @@ func Serve(version string) error {
 	// Tool 1: analyze_code
 	s.AddTool(mcp.NewTool(
 		"analyze_code",
-		mcp.WithDescription("Analyze a source file for Code Quality issues (complexity, nesting, size, bumpy roads) and security vulnerabilities (injection, XSS, deserialization, weak crypto, XXE). Returns a quality score (0-100) and detailed findings."),
+		mcp.WithDescription("Analyze a source file for Code Quality issues (complexity, nesting, size, bumpy roads) and security vulnerabilities (injection, XSS, deserialization, weak crypto, XXE). Returns a quality score (0-100) and detailed findings. Run before and after every AI edit. For a quick go/no-go safety check, use assess_file instead."),
 		mcp.WithString("file_path",
 			mcp.Required(),
 			mcp.Description("Absolute or relative path to the source file to analyze"),
@@ -103,7 +103,7 @@ func Serve(version string) error {
 	// Tool 3: get_refactoring_strategy
 	s.AddTool(mcp.NewTool(
 		"get_refactoring_strategy",
-		mcp.WithDescription("🔧 NEXT STEP after analyze_code or assess_file reports issues. Returns exact, actionable refactoring instructions with before/after examples and verification steps. Supports: deep_nesting, brain_method, bumpy_road, complex_conditional, god_class, long_parameter_list, primitive_obsession, duplicated_code."),
+		mcp.WithDescription("NEXT STEP after analyze_code or assess_file reports issues. Returns exact, actionable refactoring instructions with before/after examples and verification steps. Supports: deep_nesting, brain_method, bumpy_road, complex_conditional, god_class, long_parameter_list, primitive_obsession, duplicated_code."),
 		mcp.WithString("smell_name",
 			mcp.Required(),
 			mcp.Description("The code smell to get a refactoring strategy for (e.g., deep_nesting, brain_method, bumpy_road, complex_conditional, god_class, long_parameter_list, primitive_obsession, duplicated_code)"),
@@ -113,7 +113,7 @@ func Serve(version string) error {
 	// Tool 4: assess_file
 	s.AddTool(mcp.NewTool(
 		"assess_file",
-		mcp.WithDescription("Quick assessment of whether a file is safe for AI modification. Returns 'Go Ahead', 'Proceed with Care', or 'Stop & Refactor' with a summary."),
+		mcp.WithDescription("Quick assessment of whether a file is safe for AI modification. Returns 'Go Ahead' (80-100), 'Proceed with Care' (60-80), or 'Stop & Refactor' (0-60) with a summary. For detailed findings and a full quality score, use analyze_code instead."),
 		mcp.WithString("file_path",
 			mcp.Required(),
 			mcp.Description("Path to the file to assess"),
