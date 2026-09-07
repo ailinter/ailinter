@@ -113,7 +113,7 @@ func Serve(version string) error {
 	// Tool 4: assess_file
 	s.AddTool(mcp.NewTool(
 		"assess_file",
-		mcp.WithDescription("Quick assessment of whether a file is safe for AI modification. Returns 'Go Ahead' (80-100), 'Proceed with Care' (60-80), or 'Stop & Refactor' (0-60) with a summary. For detailed findings and a full quality score, use analyze_code instead."),
+		mcp.WithDescription("Quick assessment of whether a file is safe for AI modification. Returns 'Go Ahead' (80-100), 'Proceed with Care' (60-79), 'Needs Work' (40-59), or 'Stop & Refactor' (0-39) with a summary. For detailed findings and a full quality score, use analyze_code instead."),
 		mcp.WithString("file_path",
 			mcp.Required(),
 			mcp.Description("Path to the file to assess"),
