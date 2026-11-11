@@ -1,0 +1,31 @@
+const LIMIT = 4;
+
+class Counter {
+  constructor() {
+    this.value = 0;
+  }
+
+  inc() {
+    this.value = this.clamp(this.value + 1);
+  }
+
+  dec() {
+    this.value = this.clamp(this.value - 1);
+  }
+
+  clamp(value) {
+    return Math.min(LIMIT, value);
+  }
+
+  reset() {
+    this.value = 0;
+  }
+
+  read() {
+    return this.value;
+  }
+
+  isZero() {
+    return this.value === 0;
+  }
+}

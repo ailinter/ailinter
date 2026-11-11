@@ -1,0 +1,21 @@
+class Pipeline {
+  run() {
+    return this.prepare();
+  }
+
+  prepare() {
+    return this.execute();
+  }
+
+  execute() {
+    return this.audit();
+  }
+
+  audit() {
+    return this.report();
+  }
+
+  report() {
+    return 1;
+  }
+}

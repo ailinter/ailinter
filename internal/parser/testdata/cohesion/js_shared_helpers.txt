@@ -1,0 +1,21 @@
+const SCALE = 2;
+
+function double(value) {
+  return value * SCALE;
+}
+
+function quadruple(value) {
+  return double(double(value));
+}
+
+function describe(value) {
+  return String(quadruple(value));
+}
+
+function label(value) {
+  return "n=" + describe(value);
+}
+
+function readout(value) {
+  return label(quadruple(value));
+}

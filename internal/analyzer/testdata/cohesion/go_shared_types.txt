@@ -1,0 +1,13 @@
+package main
+
+type Data struct{ N int }
+
+func ReadData(d *Data) int { return d.N }
+
+func WriteData(d *Data, n int) { d.N = n }
+
+func CopyData(d *Data) *Data { return &Data{N: d.N} }
+
+func ClearData(d *Data) { d.N = 0 }
+
+func SizeData(d *Data) int { return d.N }
