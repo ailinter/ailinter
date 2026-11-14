@@ -1,0 +1,17 @@
+def route(code)
+  case code
+  when 1 then "a"
+  when 2 then "b"
+  when 3 then "c"
+  when 4 then "d"
+  when 5 then "e"
+  when 6 then "f"
+  when 7 then "g"
+  when 8 then "h"
+  when 9 then "i"
+  when 10 then "j"
+  when 11 then "k"
+  when 12 then "l"
+  else "z"
+  end
+end

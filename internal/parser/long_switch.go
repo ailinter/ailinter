@@ -6,17 +6,21 @@ import (
 )
 
 func DetectLongSwitch(lines []string, warnThreshold int, alertThreshold int) []Smell {
+	return DetectLongSwitchFor("", lines, warnThreshold, alertThreshold)
+}
+
+func DetectLongSwitchFor(lang string, lines []string, warnThreshold int, alertThreshold int) []Smell {
 	var smells []Smell
 
 	i := 0
 	for i < len(lines) {
 		trimmed := strings.TrimSpace(lines[i])
-		if !isSwitchStart(trimmed) {
+		if !isSwitchStartFor(lang, trimmed) {
 			i++
 			continue
 		}
 
-		branches, endLine := countSwitchBranches(lines, i)
+		branches, endLine := countSwitchBranchesFor(lang, lines, i)
 		if branches >= warnThreshold {
 			sev := "warning"
 			if branches >= alertThreshold {
@@ -35,6 +39,13 @@ func DetectLongSwitch(lines []string, warnThreshold int, alertThreshold int) []S
 	}
 
 	return smells
+}
+
+func isSwitchStartFor(lang string, line string) bool {
+	if isSwitchStart(line) {
+		return true
+	}
+	return lang == "ruby" && strings.HasPrefix(strings.TrimSpace(line), "case ") && !strings.Contains(line, ":")
 }
 
 func isSwitchStart(line string) bool {
@@ -61,14 +72,14 @@ func isSwitchStart(line string) bool {
 		}
 	}
 
-	if strings.HasPrefix(t, "when ") && !strings.Contains(t, "=") {
+	if strings.HasPrefix(t, "when ") || strings.Contains(t, " when ") {
 		return true
 	}
 
 	return false
 }
 
-func countSwitchBranches(lines []string, start int) (int, int) {
+func countSwitchBranchesFor(lang string, lines []string, start int) (int, int) {
 	branchCount := 0
 	depth := 0
 	inBlock := false
@@ -90,7 +101,7 @@ func countSwitchBranches(lines []string, start int) (int, int) {
 		}
 
 		if inBlock {
-			if isSwitchBranch(trimmed) {
+			if isSwitchBranchFor(lang, trimmed) {
 				branchCount++
 			}
 		}
@@ -114,10 +125,23 @@ func countSwitchBranches(lines []string, start int) (int, int) {
 	}
 
 	if branchCount == 0 && start < len(lines) {
-		return countIndentedBranches(lines, start)
+		return countIndentedBranchesFor(lang, lines, start)
 	}
 
 	return branchCount, endLine
+}
+
+func isSwitchBranchFor(lang string, line string) bool {
+	if isSwitchBranch(line) {
+		return true
+	}
+	if lang == "kotlin" && strings.Contains(line, "->") {
+		return true
+	}
+	if (lang == "rust" || lang == "scala" || lang == "csharp") && strings.Contains(line, "=>") {
+		return true
+	}
+	return false
 }
 
 func isSwitchBranch(line string) bool {
@@ -142,10 +166,9 @@ func isSwitchBranch(line string) bool {
 		return true
 	}
 
-	if strings.Contains(t, "=>") && !strings.Contains(t, "=") {
-		before := strings.Split(t, "=>")[0]
-		before = strings.TrimSpace(before)
-		if !strings.Contains(before, " ") || strings.Count(before, " ") <= 2 {
+	if strings.Contains(t, "=>") {
+		before := strings.TrimSpace(strings.SplitN(t, "=>", 2)[0])
+		if !strings.Contains(before, "=") && (!strings.Contains(before, " ") || strings.Count(before, " ") <= 2) {
 			return true
 		}
 	}
@@ -153,7 +176,7 @@ func isSwitchBranch(line string) bool {
 	return false
 }
 
-func countIndentedBranches(lines []string, start int) (int, int) {
+func countIndentedBranchesFor(lang string, lines []string, start int) (int, int) {
 	if start >= len(lines) {
 		return 0, start + 1
 	}
@@ -173,18 +196,25 @@ func countIndentedBranches(lines []string, start int) (int, int) {
 		}
 
 		currentIndent := detectIndent(lines[i])
-		if currentIndent <= baseIndent {
+		if currentIndent < baseIndent || (lang != "ruby" && currentIndent <= baseIndent) {
 			endLine = i
 			break
 		}
 
-		if isIndentedBranch(trimmed) {
+		if isIndentedBranchFor(lang, trimmed) {
 			branchCount++
 		}
 		endLine = i + 1
 	}
 
 	return branchCount, endLine
+}
+
+func isIndentedBranchFor(lang string, line string) bool {
+	if isIndentedBranch(line) {
+		return true
+	}
+	return lang == "kotlin" && strings.Contains(line, "->")
 }
 
 func isIndentedBranch(line string) bool {
@@ -194,7 +224,7 @@ func isIndentedBranch(line string) bool {
 		return true
 	}
 
-	if strings.HasPrefix(t, "when ") && !strings.Contains(t, "=") {
+	if strings.HasPrefix(t, "when ") || strings.Contains(t, " when ") {
 		return true
 	}
 
