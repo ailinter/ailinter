@@ -3,6 +3,13 @@
 ## What
 A switch/case or match/when block with many branches (10+ cases). Common in language parsers, HTTP handlers, and command dispatchers.
 
+## Language Notes
+- C, Java, JavaScript and Go use `switch` / `case`.
+- Rust `match`, Scala `match` and C# switch expressions count `=>` arms.
+- Kotlin `when` counts `->` arms; Swift uses `switch` / `case`.
+- Ruby `case` / `when` and Python `match` / `case` are counted by indentation.
+- A `when` expression after `return` or `val x =` is still a switch start.
+
 ## Why It's Harmful
 - **LLM error risk**: AI models are ~40% more likely to introduce bugs when modifying long switch chains (missing `break`, duplicating cases, wrong fallthrough).
 - **Edit locality**: Adding/removing a case requires touching the switch itself — can't be done independently.
