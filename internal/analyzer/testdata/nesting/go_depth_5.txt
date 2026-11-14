@@ -1,0 +1,13 @@
+package main
+
+func deep(data []int) {
+	if data != nil {
+		if len(data) > 0 {
+			for _, v := range data {
+				if v > 0 {
+					println(v)
+				}
+			}
+		}
+	}
+}

@@ -3,6 +3,10 @@
 ## What
 A function with multiple distinct blocks of deeply nested logic, each acting like a "speed bump" that forces the reader to slow down. Identified by indentation profiling — regions of depth >= 2 separated by shallow areas.
 
+## Language Notes
+- **Brace languages:** bumps are contiguous regions of `{` depth at or above the threshold.
+- **Python:** bumps are contiguous regions of indentation at or above the threshold; two sibling loops with nested bodies count as two bumps.
+
 ## Why It's Harmful
 - **Missing abstractions**: Each bump represents a logical chunk that should be its own function.
 - **Working memory tax**: Switching between different nested contexts requires mental "gear changes."
