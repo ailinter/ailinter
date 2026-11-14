@@ -103,7 +103,7 @@ func Analyze(src SourceInput, t Thresholds) QualityResult {
 
 	dupPairs := parser.DetectDuplications(bloats, lines, t.DupMinLines, t.DupMinSimilarity)
 	smells = append(smells, parser.DetectDuplicationSmells(dupPairs)...)
-	cohesion := parser.AnalyzeCohesion(bloats, lines)
+	cohesion := parser.AnalyzeCohesionLang(src.Lang, bloats, lines)
 	addSmell(&smells, parser.DetectLowCohesionSmell(cohesion, 50, 75))
 
 	raw := computeScore(scoreParams{smells: smells, loc: loc, fnCount: countReal(bloats), coh: cohesion, dups: dupPairs, t: t})
