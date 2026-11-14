@@ -13,14 +13,18 @@ type ComplexityCount struct {
 
 // CountBranches counts control-flow branches in a set of lines (e.g., a function body).
 func CountBranches(lines []string) []ComplexityCount {
+	return CountBranchesFor("", lines)
+}
+
+// CountBranchesFor uses the branch vocabulary of the language.
+func CountBranchesFor(lang string, lines []string) []ComplexityCount {
 	var results []ComplexityCount
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || isComment(trimmed) {
 			continue
 		}
-		lower := strings.ToLower(trimmed)
-		count := countBranchesInLine(lower)
+		count := countBranchesInLineFor(lang, strings.ToLower(trimmed))
 		if count > 0 {
 			results = append(results, ComplexityCount{Branches: count, Line: i + 1})
 		}
@@ -28,36 +32,49 @@ func CountBranches(lines []string) []ComplexityCount {
 	return results
 }
 
-func countBranchesInLine(line string) int {
-	keywords := []string{"if ", "else if ", "for ", "while ", "switch ", "case ", "&&", "||", "? "}
-	count := 0
-	for _, kw := range keywords {
-		count += strings.Count(line, kw)
+func countBranchesInLineFor(lang string, line string) int {
+	count := strings.Count(line, "if ") + strings.Count(line, "for ") +
+		strings.Count(line, "while ") + strings.Count(line, "switch ") +
+		strings.Count(line, "case ") + strings.Count(line, "&&") +
+		strings.Count(line, "||") + strings.Count(line, "? ")
+	switch lang {
+	case "python":
+		count += strings.Count(line, " and ") + strings.Count(line, " or ") + strings.Count(line, "except ")
+	case "ruby":
+		count += strings.Count(line, " and ") + strings.Count(line, " or ") +
+			strings.Count(line, "unless ") + strings.Count(line, "rescue ")
+	case "swift":
+		count += strings.Count(line, "guard ") + strings.Count(line, "catch ")
+	case "kotlin":
+		count += strings.Count(line, "when ")
+	case "rust":
+		count += strings.Count(line, "match ")
+	case "javascript", "typescript", "csharp", "java":
+		count += strings.Count(line, "catch ") + strings.Count(line, "??")
 	}
 	return count
 }
 
-// DetectComplexConditional checks for if/while conditions with many boolean operators.
+// DetectComplexConditional checks for control-flow conditions with many boolean operators.
 func DetectComplexConditional(lines []string, warningThreshold int, alertThreshold int) []Smell {
+	return DetectComplexConditionalFor("", lines, warningThreshold, alertThreshold)
+}
+
+// DetectComplexConditionalFor understands && / || and the Python/Ruby and/or keywords.
+func DetectComplexConditionalFor(lang string, lines []string, warningThreshold int, alertThreshold int) []Smell {
 	var smells []Smell
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || isComment(trimmed) {
+	for i := 0; i < len(lines); i++ {
+		text, end, ok := conditionalText(lang, lines, i)
+		if !ok {
 			continue
 		}
-		lower := strings.ToLower(trimmed)
-		if !strings.HasPrefix(lower, "if ") && !strings.HasPrefix(lower, "while ") {
-			continue
-		}
-		// Count && and || in the line (condition may or may not have parens)
-		andCount := strings.Count(trimmed, "&&")
-		orCount := strings.Count(trimmed, "||")
-		totalBranches := andCount + orCount
-		if totalBranches < warningThreshold {
+		i = end
+		branches := countBooleanOperators(lang, text)
+		if branches < warningThreshold {
 			continue
 		}
 		sev := "warning"
-		if totalBranches >= alertThreshold {
+		if branches >= alertThreshold {
 			sev = "alert"
 		}
 		smells = append(smells, Smell{
@@ -65,11 +82,49 @@ func DetectComplexConditional(lines []string, warningThreshold int, alertThresho
 			Severity:  sev,
 			LineStart: i + 1,
 			LineEnd:   i + 1,
-			Message:   fmt.Sprintf("Complex conditional with %d boolean branches at line %d", totalBranches, i+1),
-			AIPrompt:  fmt.Sprintf("WARNING: Complex conditional with %d boolean branches at line %d. Decompose the conditional: extract parts to well-named boolean variables or helper methods (e.g., `if user.IsEligible()`).", totalBranches, i+1),
+			Message:   fmt.Sprintf("Complex conditional with %d boolean branches at line %d", branches, i+1),
+			AIPrompt:  fmt.Sprintf("WARNING: Complex conditional with %d boolean branches at line %d. Decompose the conditional: extract parts to well-named boolean variables or helper methods (e.g., `if user.IsEligible()`).", branches, i+1),
 		})
 	}
 	return smells
+}
+
+func conditionalText(lang string, lines []string, start int) (string, int, bool) {
+	lower := strings.ToLower(strings.TrimSpace(lines[start]))
+	if !isConditionalStart(lang, lower) {
+		return "", start, false
+	}
+	text := strings.TrimSpace(lines[start])
+	end := start
+	for !strings.Contains(text, "{") && !strings.HasSuffix(text, ":") && end+1 < len(lines) && end < start+10 {
+		end++
+		text += " " + strings.TrimSpace(lines[end])
+	}
+	return text, end, true
+}
+
+func isConditionalStart(lang string, lower string) bool {
+	if strings.HasPrefix(lower, "if ") || strings.HasPrefix(lower, "if(") || strings.HasPrefix(lower, "while ") {
+		return true
+	}
+	switch lang {
+	case "python":
+		return strings.HasPrefix(lower, "elif ")
+	case "swift":
+		return strings.HasPrefix(lower, "guard ")
+	case "kotlin":
+		return strings.HasPrefix(lower, "when ")
+	}
+	return false
+}
+
+func countBooleanOperators(lang string, text string) int {
+	count := strings.Count(text, "&&") + strings.Count(text, "||")
+	switch lang {
+	case "python", "ruby":
+		count += strings.Count(text, " and ") + strings.Count(text, " or ")
+	}
+	return count
 }
 
 // DetectLongParameterList checks function signatures for too many parameters.

@@ -1,0 +1,9 @@
+def decide(a, b, c, d):
+    if a and b and c and d:
+        return 1
+    if a or b or c:
+        return 2
+    for x in range(3):
+        if x:
+            return 3
+    return 0

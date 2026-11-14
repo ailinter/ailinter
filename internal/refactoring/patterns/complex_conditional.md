@@ -3,6 +3,12 @@
 ## What
 A single `if`/`while` condition with many `&&` and `||` operators that makes the intent hard to understand.
 
+## Language Notes
+- C-like languages use `&&` and `||`.
+- Python and Ruby use `and` and `or`; the detector counts those words with surrounding spaces so identifiers are not matched.
+- Conditions that continue over several lines are joined before counting.
+- `guard` (Swift), `when` (Kotlin) and `elif` (Python) are recognised as condition starts.
+
 ## Why It's Harmful
 - **Hard to parse**: Multiple boolean operators require mental "stack" to evaluate.
 - **Poor readability**: The business rule is buried in boolean logic.

@@ -4,6 +4,11 @@
 
 A function with high cyclomatic complexity (CC) — too many decision paths through if/else, switch, for loops, and boolean operators. **Go warns at CC ≥ 9, alerts at CC ≥ 20.**
 
+## Language Notes
+- Cyclomatic complexity counts `if`, `for`, `while`, `switch`, `case`, `&&`, `||` and the ternary operator.
+- Python adds `and`, `or` and `except`; Ruby adds `and`, `or`, `unless` and `rescue`; Swift adds `guard`/`catch`; Kotlin adds `when`; Rust adds `match`.
+- String literals are not parsed, so an operator inside a string can still be counted; treat borderline scores as a prompt to read the function.
+
 ## Why It's Harmful
 
 - **Untestable**: Exponential path combinations make full coverage impossible.
