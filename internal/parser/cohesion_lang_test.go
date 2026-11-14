@@ -44,6 +44,7 @@ func TestAnalyzeCohesionLang(t *testing.T) {
 		{"JavascriptUnrelated", "javascript", "js_unrelated_functions.txt", true, 0},
 		{"JavascriptSharedHelpers", "javascript", "js_shared_helpers.txt", false, 0.8},
 		{"JavascriptMethodChain", "javascript", "js_method_chain.txt", false, 0.8},
+		{"JavascriptClassDisjointFields", "javascript", "js_class_disjoint.txt", false, 0.8},
 		{"TypeScriptClass", "typescript", "js_cohesive_class.txt", false, 1.0},
 		{"PythonClass", "python", "python_cohesive_class.txt", false, 1.0},
 		{"PythonUnrelated", "python", "python_unrelated.txt", true, 0},

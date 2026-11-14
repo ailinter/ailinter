@@ -1,0 +1,4 @@
+function label(count, other) {
+    const text = `value: ${count} and ${other}`;
+    return text;
+}

@@ -130,3 +130,13 @@ func TestAnalyze_RubyUnrelatedFunctionsStillGetLowCohesion(t *testing.T) {
 		t.Fatalf("unrelated Ruby helpers should still be flagged: %+v", result.Smells)
 	}
 }
+
+func TestAnalyze_JavascriptClassWithDisjointFieldsIsCohesive(t *testing.T) {
+	result := analyzer.Analyze(
+		analyzer.SourceInput{FilePath: "store.js", Source: readCohesionFixture(t, "js_class_disjoint.txt"), Lang: "javascript"},
+		analyzer.DefaultThresholds("javascript"),
+	)
+	if hasSmell(result, "low_cohesion") {
+		t.Fatalf("methods of one class should be cohesive even with disjoint fields: %+v", result.Smells)
+	}
+}

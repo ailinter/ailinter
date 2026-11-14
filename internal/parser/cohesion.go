@@ -129,6 +129,50 @@ func AnalyzeCohesionLang(lang string, bloats []FunctionBloat, lines []string) Co
 	return AnalyzeCohesion(bloats, lines)
 }
 
+type classScope struct {
+	name  string
+	start int
+	end   int
+}
+
+func classScopes(lines []string) []classScope {
+	var scopes []classScope
+	for i, line := range lines {
+		match := jsPatterns.classDecl.FindStringSubmatch(line)
+		if match == nil {
+			continue
+		}
+		if end := classEnd(lines, i); end > 0 {
+			scopes = append(scopes, classScope{name: match[1], start: i + 1, end: end})
+		}
+	}
+	return scopes
+}
+
+func classEnd(lines []string, start int) int {
+	depth := 0
+	opened := false
+	for i := start; i < len(lines); i++ {
+		depth += strings.Count(lines[i], "{") - strings.Count(lines[i], "}")
+		if strings.Contains(lines[i], "{") {
+			opened = true
+		}
+		if opened && depth <= 0 {
+			return i + 1
+		}
+	}
+	return 0
+}
+
+func enclosingClass(scopes []classScope, line int) string {
+	for _, scope := range scopes {
+		if line >= scope.start && line <= scope.end {
+			return scope.name
+		}
+	}
+	return ""
+}
+
 // analyzeSymbolCohesion measures how many functions share a symbol with another function.
 func analyzeSymbolCohesion(bloats []FunctionBloat, lines []string, rules symbolRules) CohesionResult {
 	validFuncs := validFunctions(bloats)
@@ -138,8 +182,12 @@ func analyzeSymbolCohesion(bloats []FunctionBloat, lines []string, rules symbolR
 
 	moduleNames := moduleLevelNames(validFuncs, lines, rules)
 	sets := make(cohesionSets, len(validFuncs))
+	scopes := classScopes(lines)
 	for i, fn := range validFuncs {
 		sets[i] = functionSymbols(fn, lines, moduleNames, rules)
+		if name := enclosingClass(scopes, fn.LineStart); name != "" {
+			sets[i]["class:"+name] = true
+		}
 	}
 
 	return cohesionFromCounts(len(validFuncs), countIsolatedSets(sets), 0)
