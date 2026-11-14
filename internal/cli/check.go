@@ -708,7 +708,8 @@ func scanAndWriteSecrets(path string, data []byte, format FormatMode) {
 }
 
 var sourceExts = map[string]bool{
-	".go": true, ".py": true, ".js": true, ".ts": true, ".tsx": true,
+	".go": true, ".py": true, ".js": true, ".jsx": true, ".mjs": true, ".cjs": true,
+	".ts": true, ".tsx": true,
 	".java": true, ".rs": true, ".rb": true, ".c": true, ".cpp": true,
 	".h": true, ".hpp": true, ".cs": true, ".swift": true, ".kt": true,
 	".kts": true, ".scala": true, ".php": true, ".pl": true, ".sh": true,

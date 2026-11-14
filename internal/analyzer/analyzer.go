@@ -93,6 +93,23 @@ type SourceInput struct {
 // Score is 0-100.
 func Analyze(src SourceInput, t Thresholds) QualityResult {
 	lines := splitLines(src.Source)
+	if !parser.IsCodeLanguage(src.Lang) {
+		return cleanResult(src, len(lines))
+	}
+	return analyzeSource(src, lines, t)
+}
+
+func cleanResult(src SourceInput, loc int) QualityResult {
+	return QualityResult{
+		Score:       100,
+		Label:       parser.Classify(100),
+		FilePath:    src.FilePath,
+		Language:    src.Lang,
+		LinesOfCode: loc,
+	}
+}
+
+func analyzeSource(src SourceInput, lines []string, t Thresholds) QualityResult {
 	loc := len(lines)
 	var smells []Smell
 	addSmell(&smells, parser.DetectNestingSmell(lines, t.NestingWarning, t.NestingAlert))

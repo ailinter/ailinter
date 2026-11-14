@@ -25,41 +25,65 @@ type QualityResult struct {
 	LinesOfCode int     `json:"lines_of_code"`
 }
 
+var languageByExtension = map[string]string{
+	".go":         "go",
+	".py":         "python",
+	".js":         "javascript",
+	".jsx":        "javascript",
+	".mjs":        "javascript",
+	".cjs":        "javascript",
+	".ts":         "typescript",
+	".tsx":        "typescript",
+	".cpp":        "cpp",
+	".cc":         "cpp",
+	".cxx":        "cpp",
+	".c++":        "cpp",
+	".c":          "c",
+	".h":          "cpp",
+	".hpp":        "cpp",
+	".java":       "java",
+	".rs":         "rust",
+	".rb":         "ruby",
+	".swift":      "swift",
+	".kt":         "kotlin",
+	".kts":        "kotlin",
+	".cs":         "csharp",
+	".php":        "php",
+	".scala":      "scala",
+	".sh":         "shell",
+	".bash":       "shell",
+	".tf":         "terraform",
+	".pl":         "perl",
+	".yaml":       "yaml",
+	".yml":        "yaml",
+	".html":       "html",
+	".htm":        "html",
+	".json":       "json",
+	".toml":       "toml",
+	".xml":        "xml",
+	".css":        "css",
+	".sql":        "sql",
+	".properties": "properties",
+	".ini":        "ini",
+	".cfg":        "cfg",
+	".conf":       "conf",
+	".env":        "env",
+}
+
 // DetectedLanguage maps a file extension to a language name.
 func DetectedLanguage(ext string) string {
-	switch ext {
-	case ".go":
-		return "go"
-	case ".py":
-		return "python"
-	case ".js":
-		return "javascript"
-	case ".ts", ".tsx":
-		return "typescript"
-	case ".cpp", ".cc", ".cxx", ".c++":
-		return "cpp"
-	case ".c":
-		return "c"
-	case ".h", ".hpp":
-		return "cpp"
-	case ".java":
-		return "java"
-	case ".rs":
-		return "rust"
-	case ".rb":
-		return "ruby"
-	case ".swift":
-		return "swift"
-	case ".kt", ".kts":
-		return "kotlin"
-	case ".cs":
-		return "csharp"
-	case ".yaml", ".yml":
-		return "yaml"
-	case ".html", ".htm":
-		return "html"
+	return languageByExtension[strings.ToLower(ext)]
+}
+
+// IsCodeLanguage reports whether structural code-quality detectors make sense for lang. Data,
+// markup and configuration formats still get secret and vulnerability scanning, but no nesting,
+// cohesion or function smells.
+func IsCodeLanguage(lang string) bool {
+	switch strings.ToLower(lang) {
+	case "json", "yaml", "toml", "xml", "html", "css", "properties", "ini", "cfg", "conf", "env":
+		return false
 	default:
-		return ""
+		return true
 	}
 }
 
