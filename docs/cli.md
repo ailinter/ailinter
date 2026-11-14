@@ -2,7 +2,7 @@
 
 Complete reference for all AILINTER CLI commands.
 
-> Complete CLI reference for ailinter v1.0.0. See the [README](https://github.com/ailinter/ailinter#cli) for a quick-start overview.
+> Complete CLI reference for ailinter v1.1.0. See the [README](https://github.com/ailinter/ailinter#cli) for a quick-start overview.
 
 ## Commands Overview
 

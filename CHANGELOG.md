@@ -1,5 +1,38 @@
 # Changelog
 
+## [v1.1.0] — 2026-11-14
+
+**Language-aware analysis.** The quality detectors now use the language of the file instead of one Go-shaped heuristic. Files may score lower after upgrading because real issues that were previously invisible are now detected; false positives are fixed rather than hidden.
+
+### Added
+
+- **Symbol cohesion for JavaScript/TypeScript, Python and Ruby** — shared module declarations, `this.*`, `self.*`, `@ivar` and class membership instead of signature types that do not exist in those languages. Related: #20, #23, #30.
+- **Language-aware signatures** — long parameter lists and primitive obsession across Go, Python, JS/TS, Java, C#, Kotlin, Swift, Rust and Ruby, including multi-line parameter lists and Go receivers. #25.
+- **C# expression-bodied members** count as functions; they are no longer invisible to `function_count` and are not flagged as lazy elements. #26.
+- **Python indentation nesting and bumpy-road analysis** — brace-only counting could not see Python nesting. #24.
+- **Language-aware complexity and conditionals** — `and`/`or`/`elif`, `guard`, `when`, `match`, `unless`/`rescue`, plus multi-line conditions. #27.
+- **Comment styles** — Python docstrings, HTML `<!-- -->`, SQL `--`, Ruby `=begin/=end`. #28, #31.
+- **Long-switch arms** — Kotlin `when`, Rust/Scala/C# `=>`, Ruby `case`/`when`, Python `match`/`case`. #29.
+- **New `function_count` refactoring strategy** — 25 strategies now. #26.
+- **Language mapping** for PHP, Scala, shell, Terraform, Perl, JSX, MJS, CJS and data formats. #21.
+
+### Fixed
+
+- JSON, TOML, XML, YAML and config files no longer fall through to Go and receive bogus structural smells. HTML/CSS keep comment analysis without tag/selector nesting. #21, #31.
+- `global_data` now uses parser function ranges: JS/C#/Java methods are not counted as module scope, and Python globals after a function are detected. #22.
+- JS classes whose methods touch different fields are cohesive as a class; template literals and strings no longer inflate brace nesting. #30.
+- Rust/Kotlin/Ruby long switches are counted instead of silently skipped. #29.
+
+### Changed
+
+- Refactoring strategies: 24 → 25 (`function_count.md`).
+- Data/config formats are excluded from structural code-quality detectors; secrets and vulnerabilities still run.
+- Language-aware docs added to `README.md`, `docs/quality.md`, `docs/refactoring.md` and `docs/index.md`.
+
+### Compatibility
+
+Minor release, non-breaking per [VERSIONING.md](VERSIONING.md): no CLI flags, MCP tool schemas, output fields, config keys or exit codes changed.
+
 ## [v1.0.0] — 2026-06-08
 
 **Stable release** — API-stable, feature-complete, production-ready. Consolidates v0.8.7 through v0.9.0 development and ships the v1.0 milestone.

@@ -1,6 +1,6 @@
 # Refactoring Strategies
 
-AILINTER provides step-by-step refactoring guidance for **24 code smells** — from pure smells (deep nesting, brain method) to data-oriented smells (primitive obsession, data class) to inheritance smells (refused bequest, parallel inheritance).
+AILINTER provides step-by-step refactoring guidance for **25 code smells** — from pure smells (deep nesting, brain method) to data-oriented smells (primitive obsession, data class) to inheritance smells (refused bequest, parallel inheritance).
 
 Call `get_refactoring_strategy("smell_name")` via MCP to get actionable instructions with before/after examples and verification steps.
 
@@ -46,6 +46,7 @@ Call `get_refactoring_strategy("smell_name")` via MCP to get actionable instruct
 | Long Switch | Replace with Map | Replace switch statements with lookup tables |
 | Paragraph of Code | Extract Method | Extract logical blocks into named methods |
 | File Bloat | Extract Module | Split oversized files into focused modules |
+| Function Count | Split by Responsibility | Group functions into focused modules; counts C# expression-bodied members |
 
 ---
 

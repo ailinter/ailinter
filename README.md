@@ -77,7 +77,7 @@ ailinter mcp                              # Start MCP server for AI assistants
 
 ### Code Quality Radar — 20 Detectors
 
-Every file gets a 0–100 quality score with clear AI guidance. 20 detectors identify code smells across 13 languages.
+Every file gets a 0–100 quality score with clear AI guidance. 20 detectors identify code smells across the core languages, with best-effort analysis elsewhere.
 
 | Score | Label | AI Guidance |
 |-------|-------|-------------|
@@ -87,6 +87,23 @@ Every file gets a 0–100 quality score with clear AI guidance. 20 detectors ide
 | 0–39 | Stop & Refactor | Must refactor before AI touches this file |
 
 **Detectors:** Deep nesting, brain method, god class, long parameter list, primitive obsession, duplicated code, complex conditional, file bloat, bumpy road, low cohesion, long method, data class, lazy element, global data, message chains, long scope variable, long switch, magic number, excessive comments, paragraph of code, shotgun surgery, complex method, parallel inheritance, refused bequest — **20 unique types**.
+
+#### Language-aware analysis
+
+The detectors use the language of the file instead of one Go-shaped heuristic:
+
+| Analysis | Languages and signal |
+|---|---|
+| Full structural detectors | Go, Python, JavaScript/TypeScript, Java, C#, Kotlin, Swift, Rust, Ruby, C/C++ |
+| Function detection | Braces for C-like languages, indentation for Python, `def`/`end` for Ruby, expression bodies for C# |
+| Cohesion | Shared types in typed languages; module symbols, `this.*` and class membership for JS/TS; `self.*` for Python; `@ivar` for Ruby |
+| Nesting and bumps | Brace depth for C-like languages; indentation for Python; JS strings, template literals and comments are stripped before counting |
+| Parameters and complexity | Language-specific signatures, `and`/`or`/`elif`, `guard`, `when`, `match`, `=>` and `->` |
+| Comments and switches | Python docstrings, HTML/SQL/Ruby comments; Kotlin/Rust/Ruby/Python switch forms |
+| Data and config | JSON, TOML, XML, YAML, properties/INI/ENV are scanned for secrets and vulnerabilities but excluded from structural code-quality detectors |
+| Markup | HTML/CSS get comment analysis; tag and selector nesting are not measured |
+
+PHP, Scala, shell and Terraform are detected and reported accurately; they receive line-level detectors and best-effort analysis rather than every language-specific rule yet.
 
 Also includes **5 embedded Go metalinters**: `go vet`, `staticcheck`, `gofmt`, `misspell`, `ineffassign` — zero additional setup.
 
@@ -147,7 +164,7 @@ AILINTER is a native MCP (Model Context Protocol) server. Add it to any MCP-comp
 | `analyze_code` | Full quality + vulnerability analysis with score | ~200 ms |
 | `scan_for_secrets` | 269+ rule secret detection (redacted output) | ~50 ms |
 | `assess_file` | Quick safety check: Go Ahead / Care / Stop | ~50 ms |
-| `get_refactoring_strategy` | Step-by-step fix for any of 24 code smells | ~10 ms |
+| `get_refactoring_strategy` | Step-by-step fix for any of 25 code smells | ~10 ms |
 | `list_hotspots` | Files with highest churn × lowest quality | ~100 ms |
 | `set_config` | Update ailinter configuration | ~10 ms |
 | `get_config` | View current configuration | ~10 ms |

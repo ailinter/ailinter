@@ -1,23 +1,25 @@
 # AILINTER Documentation
 
-Welcome to AILINTER v1.0.0 — the open-source AI Code Safety Visor. This site covers installation, usage, integration, and reference materials.
+Welcome to AILINTER v1.1.0 — the open-source AI Code Safety Visor. This site covers installation, usage, integration, and reference materials.
 
 ## Quick Summary
 
 ```
-One 30 MB binary · 20 quality detectors · 269+ secret rules · 58 vulnerability patterns · 24 refactoring strategies · 7 MCP tools · SARIF output · Zero dependencies
+One 30 MB binary · 20 quality detectors · 269+ secret rules · 58 vulnerability patterns · 25 refactoring strategies · 7 MCP tools · SARIF output · Zero dependencies
 ```
 
 AILINTER gives your AI coding assistant a safety checklist. Before the AI writes a line — and after — it evaluates the file and tells the AI whether to **Go Ahead**, **Proceed with Care**, or **Stop & Refactor**.
 
-## v1.0 Highlights
+## v1.1 Highlights
 
 | Feature | Status | Description |
 |---------|--------|-------------|
+| ✅ **Language-aware analysis** | v1.1 | JS/TS, Python and Ruby cohesion; Python indentation nesting; language signatures, comments, switches and conditionals |
+| ✅ **Data formats excluded** | v1.1 | JSON/TOML/XML/YAML/config files no longer receive bogus structural smells |
 | ✅ **VS Code Extension** | Released | Inline diagnostics, status bar score, problem matcher — install from [Marketplace](https://marketplace.visualstudio.com/items?itemName=ailinter.ailinter) |
 | ✅ **SARIF Output** | v2.1.0 | GitHub Code Scanning integration, enterprise CI, rich metadata |
 | ✅ **Diff-Aware Analysis** | `--diff` flag | Scan only changed lines — fast for large repos |
-| ✅ **24 Refactoring Strategies** | Expanded | Complete coverage: pure smells to data-oriented to inheritance |
+| ✅ **25 Refactoring Strategies** | Expanded | Complete coverage: pure smells to data-oriented to inheritance, including function count |
 | ✅ **API Stable** | v1 API | Backward-compatible CLI flags and MCP tool signatures |
 
 ## Getting Started
@@ -38,7 +40,7 @@ AILINTER gives your AI coding assistant a safety checklist. Before the AI writes
 | [Quality Scoring](quality.md) | The 0–100 score, 20 detectors, AI guidance tiers |
 | [Secret Scanning](secrets.md) | 269+ rules, 100+ providers, redacted output |
 | [Vulnerability Patterns](vulnerabilities.md) | 58 patterns across 6 categories |
-| [Refactoring Strategies](refactoring.md) | 24 code smells with step-by-step fixes |
+| [Refactoring Strategies](refactoring.md) | 25 code smells with step-by-step fixes |
 | [Configuration](configuration.md) | `.ailinter.toml` reference, thresholds, profiles |
 
 ## Reference
