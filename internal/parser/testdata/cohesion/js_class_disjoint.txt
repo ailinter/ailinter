@@ -1,0 +1,25 @@
+class Store {
+  setA() {
+    this.a = 1;
+  }
+
+  setB() {
+    this.b = 2;
+  }
+
+  setC() {
+    this.c = 3;
+  }
+
+  setD() {
+    this.d = 4;
+  }
+
+  setE() {
+    this.e = 5;
+  }
+
+  setF() {
+    this.f = 6;
+  }
+}

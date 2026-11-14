@@ -66,6 +66,9 @@ func DetectNestingSmellFor(lang string, lines []string, warningThreshold int, al
 	if lang == "python" {
 		return nestingSmell(AnalyzeNestingIndent(lines), warningThreshold, alertThreshold)
 	}
+	if lang == "javascript" || lang == "typescript" {
+		return nestingSmell(AnalyzeNestingJS(lines), warningThreshold, alertThreshold)
+	}
 	return DetectNestingSmell(lines, warningThreshold, alertThreshold)
 }
 
@@ -149,4 +152,65 @@ func countOpeners(line string) int {
 
 func countClosers(line string) int {
 	return strings.Count(line, "}")
+}
+
+// AnalyzeNestingJS counts block braces after removing strings, template literals and comments.
+func AnalyzeNestingJS(lines []string) NestingResult {
+	cleaned := make([]string, len(lines))
+	state := jsStripState{}
+	for i, line := range lines {
+		cleaned[i] = stripJSLine(line, &state)
+	}
+	return AnalyzeNesting(cleaned)
+}
+
+type jsStripState struct {
+	block    bool
+	template bool
+	quote    rune
+}
+
+func stripJSLine(line string, state *jsStripState) string {
+	var b strings.Builder
+	runes := []rune(line)
+	for i := 0; i < len(runes); i++ {
+		ch := runes[i]
+		if state.block {
+			if ch == '*' && i+1 < len(runes) && runes[i+1] == '/' {
+				state.block = false
+				i++
+			}
+			continue
+		}
+		if state.template {
+			if ch == '`' {
+				state.template = false
+			}
+			continue
+		}
+		if state.quote != 0 {
+			if ch == state.quote {
+				state.quote = 0
+			}
+			continue
+		}
+		if ch == '/' && i+1 < len(runes) && runes[i+1] == '/' {
+			break
+		}
+		if ch == '/' && i+1 < len(runes) && runes[i+1] == '*' {
+			state.block = true
+			i++
+			continue
+		}
+		if ch == '\'' || ch == '"' {
+			state.quote = ch
+			continue
+		}
+		if ch == '`' {
+			state.template = true
+			continue
+		}
+		b.WriteRune(ch)
+	}
+	return b.String()
 }

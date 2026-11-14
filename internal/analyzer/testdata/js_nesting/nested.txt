@@ -1,0 +1,12 @@
+function nested(data) {
+    if (data) {
+        if (data.length) {
+            for (const item of data) {
+                if (item.valid) {
+                    return item;
+                }
+            }
+        }
+    }
+    return null;
+}
