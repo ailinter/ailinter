@@ -173,7 +173,7 @@ func detectCodeLevelSmells(lang string, lines []string, bloats []FunctionBloat, 
 	smells = append(smells, parser.DetectPrimitiveObsessionFor(lang, lines)...)
 	smells = append(smells, parser.DetectLongScopeVariables(lines, bloats, t.LongScopeVarLines)...)
 	smells = append(smells, parser.DetectLongSwitch(lines, t.LongSwitchWarn, t.LongSwitchAlert)...)
-	addSmell(&smells, parser.DetectExcessiveComments(lines, t.CommentRatioWarning))
+	addSmell(&smells, parser.DetectExcessiveCommentsFor(lang, lines, t.CommentRatioWarning))
 	addSmell(&smells, parser.DetectGlobalData(lines, bloats, t.GlobalDataWarning))
 	return smells
 }

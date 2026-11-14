@@ -1,0 +1,12 @@
+<!-- This is a long comment block.
+It explains the page.
+It has many lines.
+It keeps going.
+And going.
+And going.
+And going.
+And going.
+And going.
+And going.
+-->
+<html><body><p>Hello</p></body></html>

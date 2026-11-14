@@ -1,0 +1,11 @@
+-- first comment
+-- second comment
+-- third comment
+-- fourth comment
+-- fifth comment
+-- sixth comment
+-- seventh comment
+-- eighth comment
+-- ninth comment
+-- tenth comment
+SELECT 1;
