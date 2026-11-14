@@ -47,8 +47,8 @@ func TestAnalyze_CodeLanguagesStillAnalyzed(t *testing.T) {
 }
 
 func TestIsCodeLanguage(t *testing.T) {
-	assertCodeLanguages(t, []string{"go", "javascript", "python", "php", "scala", "shell", "sql"}, true)
-	assertCodeLanguages(t, []string{"json", "yaml", "toml", "xml", "html", "css", "env"}, false)
+	assertCodeLanguages(t, []string{"go", "javascript", "python", "php", "scala", "shell", "sql", "html", "css"}, true)
+	assertCodeLanguages(t, []string{"json", "yaml", "toml", "xml", "env"}, false)
 }
 
 func assertCodeLanguages(t *testing.T, langs []string, want bool) {

@@ -80,7 +80,7 @@ func DetectedLanguage(ext string) string {
 // cohesion or function smells.
 func IsCodeLanguage(lang string) bool {
 	switch strings.ToLower(lang) {
-	case "json", "yaml", "toml", "xml", "html", "css", "properties", "ini", "cfg", "conf", "env":
+	case "json", "yaml", "toml", "xml", "properties", "ini", "cfg", "conf", "env":
 		return false
 	default:
 		return true
