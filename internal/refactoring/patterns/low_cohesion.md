@@ -4,6 +4,14 @@
 
 A package or file contains functions that serve unrelated purposes. For example, a `utils.go` with string helpers, file I/O, math operations, and HTTP helpers all mixed together.
 
+## Language Notes
+- **Typed languages (Go, Java, C#, Kotlin, Swift):** functions are cohesive when they share types in their signatures.
+- **JavaScript / TypeScript:** cohesion is measured by shared module declarations and `this.*` fields.
+- **Python:** cohesion is measured by shared module declarations and `self.*` fields.
+- **Ruby:** cohesion is measured by shared module declarations and `@ivar` fields.
+
+A class whose methods share state or call each other is cohesive even when no type signatures are present. A file of independent helpers is still flagged.
+
 ## Why It's Harmful
 
 - **Discovery failure**: Developers and AI models miss reusable code because it's in an unrelated file.

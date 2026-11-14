@@ -25,18 +25,30 @@ type cohesionCase struct {
 	name    string
 	lang    string
 	fixture string
-	detect  func([]string) []parser.FunctionBloat
 	low     bool
 	min     float64
 }
 
+var cohesionDetectors = map[string]func([]string) []parser.FunctionBloat{
+	"python": func(lines []string) []parser.FunctionBloat {
+		return parser.DetectFunctionBloatsIndent(lines, 4)
+	},
+	"ruby": func(lines []string) []parser.FunctionBloat {
+		return parser.DetectFunctionBloatsRuby(lines)
+	},
+}
+
 func TestAnalyzeCohesionLang(t *testing.T) {
 	cases := []cohesionCase{
-		{"JavascriptClass", "javascript", "js_cohesive_class.txt", parser.DetectFunctionBloatsTS, false, 1.0},
-		{"JavascriptUnrelated", "javascript", "js_unrelated_functions.txt", parser.DetectFunctionBloatsTS, true, 0},
-		{"JavascriptSharedHelpers", "javascript", "js_shared_helpers.txt", parser.DetectFunctionBloatsTS, false, 0.8},
-		{"JavascriptMethodChain", "javascript", "js_method_chain.txt", parser.DetectFunctionBloatsTS, false, 0.8},
-		{"TypeScriptClass", "typescript", "js_cohesive_class.txt", parser.DetectFunctionBloatsTS, false, 1.0},
+		{"JavascriptClass", "javascript", "js_cohesive_class.txt", false, 1.0},
+		{"JavascriptUnrelated", "javascript", "js_unrelated_functions.txt", true, 0},
+		{"JavascriptSharedHelpers", "javascript", "js_shared_helpers.txt", false, 0.8},
+		{"JavascriptMethodChain", "javascript", "js_method_chain.txt", false, 0.8},
+		{"TypeScriptClass", "typescript", "js_cohesive_class.txt", false, 1.0},
+		{"PythonClass", "python", "python_cohesive_class.txt", false, 1.0},
+		{"PythonUnrelated", "python", "python_unrelated.txt", true, 0},
+		{"RubyClass", "ruby", "ruby_cohesive_class.txt", false, 1.0},
+		{"RubyUnrelated", "ruby", "ruby_unrelated.txt", true, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -47,8 +59,12 @@ func TestAnalyzeCohesionLang(t *testing.T) {
 
 func assertCohesion(t *testing.T, tc cohesionCase) {
 	t.Helper()
+	detector := cohesionDetectors[tc.lang]
+	if detector == nil {
+		detector = parser.DetectFunctionBloatsTS
+	}
 	lines := strings.Split(readCohesionFixture(t, tc.fixture), "\n")
-	result := parser.AnalyzeCohesionLang(tc.lang, tc.detect(lines), lines)
+	result := parser.AnalyzeCohesionLang(tc.lang, detector(lines), lines)
 	if result.IsLowCohesion != tc.low {
 		t.Errorf("low cohesion = %v, want %v (%+v)", result.IsLowCohesion, tc.low, result)
 	}
