@@ -376,3 +376,107 @@ func countPrimitiveTypes(params string) int {
 func isIdentifierBreak(r rune) bool {
 	return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '_')
 }
+
+// DetectExcessiveCommentsFor understands line and block comments per language, including Python
+// docstrings, HTML comments, SQL -- and Ruby =begin/=end.
+func DetectExcessiveCommentsFor(lang string, lines []string, ratioThreshold float64) *Smell {
+	if len(lines) < 10 {
+		return nil
+	}
+	commentLines, nonBlank := countCommentLines(lang, lines)
+	if nonBlank == 0 {
+		return nil
+	}
+	ratio := float64(commentLines) / float64(nonBlank)
+	if ratio < ratioThreshold {
+		return nil
+	}
+	sev := "warning"
+	if ratio >= ratioThreshold*2 {
+		sev = "alert"
+	}
+	return &Smell{
+		Name:     "excessive_comments",
+		Severity: sev,
+		Message:  fmt.Sprintf("Excessive comments: %.0f%% of non-blank lines are comments (%d/%d)", ratio*100, commentLines, nonBlank),
+		AIPrompt: fmt.Sprintf("NOTE: %.0f%% of this file is comments (%d/%d lines). Consider renaming functions and variables to be self-documenting instead of relying on comments.",
+			ratio*100, commentLines, nonBlank),
+	}
+}
+
+func countCommentLines(lang string, lines []string) (int, int) {
+	comments := 0
+	nonBlank := 0
+	blockEnd := ""
+	pythonQuote := ""
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		nonBlank++
+		if pythonQuote != "" {
+			comments++
+			if strings.Contains(trimmed, pythonQuote) {
+				pythonQuote = ""
+			}
+			continue
+		}
+		if blockEnd != "" {
+			comments++
+			if strings.Contains(trimmed, blockEnd) {
+				blockEnd = ""
+			}
+			continue
+		}
+		if lang == "python" && isTripleQuote(trimmed) {
+			comments++
+			pythonQuote = trimmed[:3]
+			if strings.Count(trimmed, pythonQuote) > 1 {
+				pythonQuote = ""
+			}
+			continue
+		}
+		if isLineComment(lang, trimmed) {
+			comments++
+			continue
+		}
+		if end, ok := blockCommentStart(lang, trimmed); ok {
+			comments++
+			if !strings.Contains(trimmed, end) || strings.Count(trimmed, end) == 0 {
+				blockEnd = end
+			}
+		}
+	}
+	return comments, nonBlank
+}
+
+func isTripleQuote(line string) bool {
+	return strings.HasPrefix(line, `"""`) || strings.HasPrefix(line, `'''`)
+}
+
+func isLineComment(lang string, line string) bool {
+	if strings.HasPrefix(line, "//") {
+		return true
+	}
+	switch lang {
+	case "python", "ruby", "perl", "shell":
+		return strings.HasPrefix(line, "#")
+	case "sql":
+		return strings.HasPrefix(line, "--")
+	}
+	return strings.HasPrefix(line, "#") || strings.HasPrefix(line, "/*") ||
+		strings.HasPrefix(line, " *") || strings.HasPrefix(line, "*/")
+}
+
+func blockCommentStart(lang string, line string) (string, bool) {
+	switch {
+	case strings.HasPrefix(line, "/*"):
+		return "*/", true
+	case lang == "html" && strings.HasPrefix(line, "<!--"):
+		return "-->", true
+	case lang == "ruby" && strings.HasPrefix(line, "=begin"):
+		return "=end", true
+	}
+	return "", false
+}

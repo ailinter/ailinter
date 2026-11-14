@@ -1,0 +1,31 @@
+"""This module has a long docstring.
+
+It explains many things in detail.
+
+The documentation is longer than the code.
+
+That is the point of this fixture.
+
+More prose here.
+
+And here.
+
+And here.
+
+And here.
+
+And here.
+
+And here.
+
+And here.
+
+And here.
+
+And here.
+
+And here.
+"""
+
+def add(a, b):
+    return a + b

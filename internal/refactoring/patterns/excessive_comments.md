@@ -3,6 +3,12 @@
 ## What
 Comments that explain what the code does, when the code itself could be renamed to be self-documenting. A comment ratio above 30% of total lines indicates the code is not expressive enough.
 
+## Language Notes
+- Python docstrings (`"""` / `'''`) count as comments in addition to `#` lines.
+- HTML `<!-- -->` and SQL `--` comments are recognised.
+- Ruby `=begin`/`=end` blocks and `#` lines are recognised.
+- Go/JS/C-style `//` and `/* */` blocks are recognised.
+
 ## Why It's Harmful
 - **Lies over time**: Comments rot. Code gets refactored, comments don't. The compiler checks code correctness, not comment accuracy.
 - **Signal dilution**: Important comments (why, not what) get buried in noise. Developers learn to ignore all comments.
