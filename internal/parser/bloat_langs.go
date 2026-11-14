@@ -722,3 +722,53 @@ func DetectFunctionBloatsTS(lines []string) []FunctionBloat {
 
 	return results
 }
+
+// DetectFunctionBloatsCSharp detects C# methods, including expression-bodied members.
+func DetectFunctionBloatsCSharp(lines []string) []FunctionBloat {
+	braced := DetectFunctionBloatsJava(lines)
+	expressed := detectExpressionBodiedCSharp(lines)
+	return mergeBloats(braced, expressed)
+}
+
+func mergeBloats(first []FunctionBloat, second []FunctionBloat) []FunctionBloat {
+	merged := make([]FunctionBloat, 0, len(first)+len(second))
+	i, j := 0, 0
+	for i < len(first) && j < len(second) {
+		if first[i].LineStart <= second[j].LineStart {
+			merged = append(merged, first[i])
+			i++
+		} else {
+			merged = append(merged, second[j])
+			j++
+		}
+	}
+	merged = append(merged, first[i:]...)
+	return append(merged, second[j:]...)
+}
+
+func detectExpressionBodiedCSharp(lines []string) []FunctionBloat {
+	var results []FunctionBloat
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
+			continue
+		}
+		open := strings.Index(trimmed, "(")
+		close := strings.LastIndex(trimmed, ")")
+		if open < 0 || close < open || !strings.Contains(trimmed[close:], "=>") {
+			continue
+		}
+		prefix := strings.Fields(strings.TrimSpace(trimmed[:open]))
+		if len(prefix) < 2 {
+			continue
+		}
+		name := prefix[len(prefix)-1]
+		if name == "if" || name == "for" || name == "while" || name == "switch" || name == "catch" {
+			continue
+		}
+		results = append(results, FunctionBloat{
+			Name: name, LineCount: 1, LineStart: i + 1, ExpressionBody: true,
+		})
+	}
+	return results
+}
