@@ -142,7 +142,7 @@ func detectFunctionSmells(lang string, lines []string, bloats []FunctionBloat, t
 			addSmell(&smells, parser.DetectBumpyRoadSmellAtFor(lang, funcLines, t.BumpyRoadNestingDepth, t.BumpyRoadBumpsWarning, fn.LineStart))
 		}
 
-		cc := cyclomaticComplexity(funcLines)
+		cc := cyclomaticComplexity(lang, funcLines)
 		if cc < t.FuncCCWarning {
 			continue
 		}
@@ -162,7 +162,7 @@ func detectFunctionSmells(lang string, lines []string, bloats []FunctionBloat, t
 
 func detectCodeLevelSmells(lang string, lines []string, bloats []FunctionBloat, t Thresholds) []Smell {
 	smells := []Smell{}
-	smells = append(smells, parser.DetectComplexConditional(lines, t.ComplexCondBranchesWarn, t.ComplexCondBranchesAlert)...)
+	smells = append(smells, parser.DetectComplexConditionalFor(lang, lines, t.ComplexCondBranchesWarn, t.ComplexCondBranchesAlert)...)
 	smells = append(smells, parser.DetectLongParameterListFor(lang, lines, t.MaxArgumentsWarn, t.MaxArgumentsAlert)...)
 	fnCount := countReal(bloats)
 	addSmell(&smells, functionCountSmell(fnCount, t))
@@ -330,8 +330,8 @@ func sliceFuncBody(lines []string, fn FunctionBloat) []string {
 	return lines[start:end]
 }
 
-func cyclomaticComplexity(lines []string) int {
-	counts := parser.CountBranches(lines)
+func cyclomaticComplexity(lang string, lines []string) int {
+	counts := parser.CountBranchesFor(lang, lines)
 	cc := 1
 	for _, c := range counts {
 		cc += c.Branches
