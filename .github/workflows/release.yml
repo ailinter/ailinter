@@ -35,8 +35,13 @@ jobs:
           suffix=""
           [ "${{ matrix.os }}" = "windows" ] && suffix=".exe"
           version="${GITHUB_REF#refs/tags/}"
+          commit="${GITHUB_SHA:0:7}"
+          build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build \
-            -ldflags "-s -w -X main.version=${version}" \
+            -ldflags "-s -w \
+              -X github.com/ailinter/ailinter/internal/version.Version=${version} \
+              -X github.com/ailinter/ailinter/internal/version.Commit=${commit} \
+              -X github.com/ailinter/ailinter/internal/version.BuildDate=${build_date}" \
             -o "ailinter_${version}_${{ matrix.os }}_${{ matrix.arch }}${suffix}" \
             ./cmd/ailinter
       - name: Checksum
@@ -118,20 +123,38 @@ jobs:
           git clone "https://x-access-token:${GH_TOKEN}@github.com/ailinter/homebrew-ailinter.git" /tmp/homebrew-tap
           cd /tmp/homebrew-tap
 
-          # Update version string
-          sed -i 's/version ".*"/version "'"${VERSION}"'"/' Formula/ailinter.rb
+          cat > Formula/ailinter.rb <<EOF
+          class Ailinter < Formula
+            desc "AI-powered code quality linter and safety visor for AI-assisted development"
+            homepage "https://github.com/ailinter/ailinter"
+            version "${VERSION}"
+            license "MIT"
 
-          # Update macOS URLs and checksums
-          sed -i "s|url \".*darwin_arm64\"|url \"https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_${VERSION}_darwin_arm64\"|" Formula/ailinter.rb
-          sed -i "s|url \".*darwin_amd64\"|url \"https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_${VERSION}_darwin_amd64\"|" Formula/ailinter.rb
-          sed -i "s|url \".*linux_arm64\"|url \"https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_${VERSION}_linux_arm64\"|" Formula/ailinter.rb
-          sed -i "s|url \".*linux_amd64\"|url \"https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_${VERSION}_linux_amd64\"|" Formula/ailinter.rb
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_${VERSION}_darwin_arm64"
+                sha256 "${DARWIN_ARM64}"
+              else
+                url "https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_${VERSION}_darwin_amd64"
+                sha256 "${DARWIN_AMD64}"
+              end
+            end
 
-          # Update checksums — each sha256 line follows its url line
-          awk -v c="$DARWIN_ARM64" '/url.*darwin_arm64/{getline; sub(/sha256 ".*"/, "sha256 \""c"\""); print; next} 1' Formula/ailinter.rb > /tmp/f.rb && mv /tmp/f.rb Formula/ailinter.rb
-          awk -v c="$DARWIN_AMD64" '/url.*darwin_amd64/{getline; sub(/sha256 ".*"/, "sha256 \""c"\""); print; next} 1' Formula/ailinter.rb > /tmp/f.rb && mv /tmp/f.rb Formula/ailinter.rb
-          awk -v c="$LINUX_ARM64" '/url.*linux_arm64/{getline; sub(/sha256 ".*"/, "sha256 \""c"\""); print; next} 1' Formula/ailinter.rb > /tmp/f.rb && mv /tmp/f.rb Formula/ailinter.rb
-          awk -v c="$LINUX_AMD64" '/url.*linux_amd64/{getline; sub(/sha256 ".*"/, "sha256 \""c"\""); print; next} 1' Formula/ailinter.rb > /tmp/f.rb && mv /tmp/f.rb Formula/ailinter.rb
+            on_linux do
+              if Hardware::CPU.arm?
+                url "https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_${VERSION}_linux_arm64"
+                sha256 "${LINUX_ARM64}"
+              else
+                url "https://github.com/ailinter/ailinter/releases/download/${VERSION}/ailinter_${VERSION}_linux_amd64"
+                sha256 "${LINUX_AMD64}"
+              end
+            end
+
+            def install
+              bin.install Dir["*"].first => "ailinter"
+            end
+          end
+          EOF
 
           # Commit and push
           if git diff --quiet; then
