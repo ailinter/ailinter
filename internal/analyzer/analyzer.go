@@ -112,10 +112,10 @@ func cleanResult(src SourceInput, loc int) QualityResult {
 func analyzeSource(src SourceInput, lines []string, t Thresholds) QualityResult {
 	loc := len(lines)
 	var smells []Smell
-	addSmell(&smells, parser.DetectNestingSmell(lines, t.NestingWarning, t.NestingAlert))
+	addSmell(&smells, parser.DetectNestingSmellFor(src.Lang, lines, t.NestingWarning, t.NestingAlert))
 	addSmell(&smells, parser.DetectFileBloat(loc, t.FileLOCWarning, t.FileLOCAlert, t.FileLOCCritical))
 	bloats := detectFunctions(src.Lang, lines)
-	smells = append(smells, detectFunctionSmells(lines, bloats, t)...)
+	smells = append(smells, detectFunctionSmells(src.Lang, lines, bloats, t)...)
 	smells = append(smells, detectCodeLevelSmells(lines, bloats, t)...)
 
 	dupPairs := parser.DetectDuplications(bloats, lines, t.DupMinLines, t.DupMinSimilarity)
@@ -132,14 +132,14 @@ func analyzeSource(src SourceInput, lines []string, t Thresholds) QualityResult 
 	}
 	return QualityResult{Score: s, Label: classifyLabel(s), Smells: smells, FilePath: src.FilePath, Language: src.Lang, LinesOfCode: loc}
 }
-func detectFunctionSmells(lines []string, bloats []FunctionBloat, t Thresholds) []Smell {
+func detectFunctionSmells(lang string, lines []string, bloats []FunctionBloat, t Thresholds) []Smell {
 	var smells []Smell
 	smells = append(smells, parser.DetectBrainMethodSmell(bloats, t.FuncLOCWarning, t.FuncLOCAlert)...)
 
 	for _, fn := range bloats {
 		funcLines := sliceFuncBody(lines, fn)
 		if fn.LineCount >= 10 {
-			addSmell(&smells, parser.DetectBumpyRoadSmellAt(funcLines, t.BumpyRoadNestingDepth, t.BumpyRoadBumpsWarning, fn.LineStart))
+			addSmell(&smells, parser.DetectBumpyRoadSmellAtFor(lang, funcLines, t.BumpyRoadNestingDepth, t.BumpyRoadBumpsWarning, fn.LineStart))
 		}
 
 		cc := cyclomaticComplexity(funcLines)

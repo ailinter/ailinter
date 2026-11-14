@@ -152,3 +152,72 @@ func DetectBumpyRoadSmellAt(lines []string, bumpDepth int, bumpsWarning int, fun
 			"Target: 0 bumps (flat, readable 'code highway').", len(result.Bumps)),
 	}
 }
+
+// DetectBumpyRoadSmellAtFor chooses brace or indentation bumps by language.
+func DetectBumpyRoadSmellAtFor(lang string, lines []string, bumpDepth int, bumpsWarning int, funcStartLine int) *Smell {
+	if lang != "python" {
+		return DetectBumpyRoadSmellAt(lines, bumpDepth, bumpsWarning, funcStartLine)
+	}
+	return bumpySmellFrom(DetectBumpyRoadForFunctionIndent(lines, bumpDepth, bumpsWarning), funcStartLine)
+}
+
+func bumpRanges(result BumpyRoadResult, funcStartLine int) string {
+	parts := make([]string, 0, len(result.Bumps))
+	for _, b := range result.Bumps {
+		parts = append(parts, fmt.Sprintf("%d-%d", funcStartLine+b.StartLine-1, funcStartLine+b.EndLine-1))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func bumpySmellFrom(result BumpyRoadResult, funcStartLine int) *Smell {
+	if !result.IsBumpyRoad {
+		return nil
+	}
+	return &Smell{
+		Name:      "bumpy_road",
+		Severity:  result.Severity,
+		LineStart: funcStartLine + result.Bumps[0].StartLine - 1,
+		LineEnd:   funcStartLine + result.Bumps[len(result.Bumps)-1].EndLine - 1,
+		Message:   fmt.Sprintf("Bumpy Road: %d bumps (max depth %d) at ranges: %s", len(result.Bumps), result.MaxDepth, bumpRanges(result, funcStartLine)),
+		AIPrompt: fmt.Sprintf("WARNING: Bumpy Road detected — %d separate blocks of deeply nested logic. "+
+			"COGNITIVE NOTE: Each nested block taxes working memory (limited to ~3-4 items). "+
+			"REFACTORING: Use Extract Method for each bump. Create well-named private functions. "+
+			"Target: 0 bumps (flat, readable 'code highway').", len(result.Bumps)),
+	}
+}
+
+// DetectBumpyRoadForFunctionIndent finds bumps from Python indentation levels.
+func DetectBumpyRoadForFunctionIndent(lines []string, bumpDepthThreshold int, bumpsWarning int) BumpyRoadResult {
+	result := BumpyRoadResult{}
+	var current *BumpRange
+	for i, depth := range indentDepths(lines) {
+		current = trackIndentBump(&result, current, i, depth, bumpDepthThreshold)
+	}
+	closeIndentBump(&result, current, len(lines))
+	return classifyBumpyRoad(result, bumpsWarning)
+}
+
+func trackIndentBump(result *BumpyRoadResult, current *BumpRange, index int, depth int, threshold int) *BumpRange {
+	if depth < 0 {
+		return current
+	}
+	if depth >= threshold {
+		if current == nil {
+			current = &BumpRange{StartLine: index + 1}
+		}
+		current.LineCount++
+		current.MaxDepth = max(current.MaxDepth, depth)
+		result.MaxDepth = max(result.MaxDepth, depth)
+		return current
+	}
+	return closeIndentBump(result, current, index+1)
+}
+
+func closeIndentBump(result *BumpyRoadResult, current *BumpRange, end int) *BumpRange {
+	if current == nil {
+		return nil
+	}
+	current.EndLine = end
+	result.Bumps = append(result.Bumps, *current)
+	return nil
+}

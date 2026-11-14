@@ -1,0 +1,11 @@
+def process(data):
+    for item in data:
+        if item.valid:
+            if item.count > 0:
+                handle(item)
+                log(item)
+    for item in data:
+        if item.flagged:
+            if item.count > 1:
+                flag(item)
+                log(item)

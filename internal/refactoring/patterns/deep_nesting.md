@@ -3,6 +3,11 @@
 ## What
 Code has many conditionals and loops nested inside one another (3+ levels deep). Also known as the Arrow Anti-Pattern due to the visual shape of deep indentation.
 
+## Language Notes
+- **Brace languages:** nesting is the `{` depth.
+- **Python:** nesting is the indentation level. Bracket continuations and docstrings are skipped, so a wrapped call does not look deeper than it is.
+- **JavaScript/TypeScript:** template literals and object literals can inflate a raw brace count; the analyzer is line-based, so prefer extracting a helper when the visual nesting is genuinely deep.
+
 ## Why It's Harmful
 - **Cognitive overload**: Working memory limited to ~3-4 items. Each nesting level requires holding additional context.
 - **High defect correlation**: Research shows nested complexity is a stronger predictor of defects than cyclomatic complexity.

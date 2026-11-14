@@ -43,26 +43,100 @@ func AnalyzeNesting(lines []string) NestingResult {
 	return NestingResult{MaxDepth: maxDepth, DeepestLine: deepestLine}
 }
 
+// AnalyzeNestingIndent measures nesting by indentation, for languages such as Python that have no
+// braces. Lines that continue a bracket expression or a docstring do not add a level.
+func AnalyzeNestingIndent(lines []string) NestingResult {
+	result := NestingResult{}
+	for i, depth := range indentDepths(lines) {
+		if depth > result.MaxDepth {
+			result.MaxDepth = depth
+			result.DeepestLine = i + 1
+		}
+	}
+	return result
+}
+
 // DetectNestingSmell checks whether nesting exceeds a threshold and returns a smell if so.
 func DetectNestingSmell(lines []string, warningThreshold int, alertThreshold int) *Smell {
-	r := AnalyzeNesting(lines)
-	if r.MaxDepth < warningThreshold {
+	return nestingSmell(AnalyzeNesting(lines), warningThreshold, alertThreshold)
+}
+
+// DetectNestingSmellFor chooses brace or indentation nesting by language.
+func DetectNestingSmellFor(lang string, lines []string, warningThreshold int, alertThreshold int) *Smell {
+	if lang == "python" {
+		return nestingSmell(AnalyzeNestingIndent(lines), warningThreshold, alertThreshold)
+	}
+	return DetectNestingSmell(lines, warningThreshold, alertThreshold)
+}
+
+func nestingSmell(result NestingResult, warningThreshold int, alertThreshold int) *Smell {
+	if result.MaxDepth < warningThreshold {
 		return nil
 	}
-
 	sev := "warning"
-	if r.MaxDepth >= alertThreshold {
+	if result.MaxDepth >= alertThreshold {
 		sev = "alert"
 	}
-
 	return &Smell{
 		Name:      "deep_nesting",
 		Severity:  sev,
-		LineStart: r.DeepestLine,
-		LineEnd:   r.DeepestLine,
-		Message:   fmt.Sprintf("Nesting depth %d at line %d", r.MaxDepth, r.DeepestLine),
-		AIPrompt:  fmt.Sprintf("WARNING: Deep nested complexity (depth %d) detected at line %d. Use Guard Clauses to flatten nested logic and Extract Method to separate concerns.", r.MaxDepth, r.DeepestLine),
+		LineStart: result.DeepestLine,
+		LineEnd:   result.DeepestLine,
+		Message:   fmt.Sprintf("Nesting depth %d at line %d", result.MaxDepth, result.DeepestLine),
+		AIPrompt:  fmt.Sprintf("WARNING: Deep nested complexity (depth %d) detected at line %d. Use Guard Clauses to flatten nested logic and Extract Method to separate concerns.", result.MaxDepth, result.DeepestLine),
 	}
+}
+
+// indentDepths returns the indentation level of each code line, or -1 for blank, comment,
+// docstring and bracket-continuation lines.
+func indentDepths(lines []string) []int {
+	depths := make([]int, len(lines))
+	for i := range depths {
+		depths[i] = -1
+	}
+	stack := make([]int, 0)
+	bracketDepth := 0
+	inTriple := false
+	triple := ""
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if inTriple {
+			if strings.Contains(trimmed, triple) {
+				inTriple = false
+			}
+			continue
+		}
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, `"""`) || strings.HasPrefix(trimmed, `'''`) {
+			triple = trimmed[:3]
+			inTriple = strings.Count(trimmed, triple) == 1
+			continue
+		}
+		if bracketDepth > 0 {
+			bracketDepth = max(0, bracketDepth+netBrackets(trimmed))
+			continue
+		}
+
+		indent := countLeadingSpaces(line)
+		for len(stack) > 0 && indent < stack[len(stack)-1] {
+			stack = stack[:len(stack)-1]
+		}
+		if len(stack) == 0 || indent > stack[len(stack)-1] {
+			stack = append(stack, indent)
+		}
+		depths[i] = len(stack) - 1
+		bracketDepth = max(0, bracketDepth+netBrackets(trimmed))
+	}
+	return depths
+}
+
+func netBrackets(line string) int {
+	opens := strings.Count(line, "(") + strings.Count(line, "[") + strings.Count(line, "{")
+	closes := strings.Count(line, ")") + strings.Count(line, "]") + strings.Count(line, "}")
+	return opens - closes
 }
 
 func countOpeners(line string) int {
