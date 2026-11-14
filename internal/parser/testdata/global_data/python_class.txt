@@ -1,0 +1,9 @@
+class Store:
+    def set_a(self):
+        self.a = 1
+
+    def set_b(self):
+        self.b = 2
+
+    def set_c(self):
+        self.c = 3

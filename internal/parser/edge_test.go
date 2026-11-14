@@ -100,7 +100,7 @@ func TestDetectGlobalData_NotTriggered(t *testing.T) {
 		"package main",
 		"func main() { x := 1; println(x) }",
 	}
-	s := parser.DetectGlobalData(code, 3)
+	s := parser.DetectGlobalData(code, parser.DetectFunctionBloats(code), 3)
 	if s != nil {
 		t.Errorf("expected nil, got %v", s.Message)
 	}
@@ -117,7 +117,7 @@ func TestDetectGlobalData_Triggered(t *testing.T) {
 		"",
 		"func main() { println(global1) }",
 	}
-	s := parser.DetectGlobalData(code, 3)
+	s := parser.DetectGlobalData(code, parser.DetectFunctionBloats(code), 3)
 	if s == nil {
 		t.Error("expected global data smell")
 	} else if s.Name != "global_data" {
@@ -131,7 +131,7 @@ func TestDetectGlobalData_BelowThreshold(t *testing.T) {
 		"var x = 1",
 		"func main() { println(x) }",
 	}
-	s := parser.DetectGlobalData(code, 5)
+	s := parser.DetectGlobalData(code, parser.DetectFunctionBloats(code), 5)
 	if s != nil {
 		t.Errorf("expected nil (1 global < 5 threshold): %v", s.Message)
 	}

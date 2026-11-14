@@ -3,6 +3,14 @@
 ## What
 Mutable variables declared at the package or module scope, accessible from anywhere. Includes global singletons, module-level state maps, and unexported-but-mutable top-level variables.
 
+## Language Notes
+- **Go:** package-level `var` and `const` declarations.
+- **JavaScript / TypeScript:** module-level `let`, `const` and `var`, plus top-level assignments. Class fields (`this.count`) are instance state and are not globals.
+- **Python:** module-level assignments outside functions. Class attributes and `self.count` are instance state and are not globals.
+- **C# / Java:** static fields are global state. Instance fields are not.
+
+The detector uses the function ranges from the parser, so a method body is never counted as module scope.
+
 ## Why It's Harmful
 - **Hidden coupling**: Any function that reads a global depends on every function that writes to it. Dependencies are invisible.
 - **Test isolation impossible**: Tests cannot run in parallel when they share global state. Test order matters.
