@@ -1,5 +1,12 @@
 # Changelog
 
+## [v1.1.1] — 2026-11-14
+
+### Fixed
+
+- Release binaries now report the tagged version; the build injected `main.version` instead of `internal/version.Version`, so v1.1.0 showed `0.0.0-dev`.
+- The Homebrew formula now includes download URLs, not only checksums, so `brew upgrade`/`brew reinstall` work. The tap formula for v1.1.0 was patched in place.
+
 ## [v1.1.0] — 2026-11-14
 
 **Language-aware analysis.** The quality detectors now use the language of the file instead of one Go-shaped heuristic. Files may score lower after upgrading because real issues that were previously invisible are now detected; false positives are fixed rather than hidden.
