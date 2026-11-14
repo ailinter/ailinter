@@ -1,6 +1,6 @@
 # CI Integration
 
-Integrate AILINTER into your CI pipeline to block PRs with low quality scores, hardcoded secrets, or vulnerabilities. v1.0 supports **SARIF output** for GitHub Code Scanning, **quality gates** for score enforcement, and **diff-aware analysis** for fast incremental scans.
+Integrate AILINTER into your CI pipeline to block PRs with low quality scores, hardcoded secrets, or vulnerabilities. v1.x supports **SARIF output** for GitHub Code Scanning, **quality gates** for score enforcement, and **diff-aware analysis** for fast incremental scans.
 
 ---
 

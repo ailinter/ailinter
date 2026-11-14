@@ -17,6 +17,25 @@ How AILINTER's 0–100 quality score works and what each detector catches.
 
 Deep Nesting, Brain Method, File Bloat, Bumpy Road, Complex Conditional, Cyclomatic Complexity, Long Parameter List, Code Duplication, Low Cohesion, Message Chains, Primitive Obsession, Excessive Comments, Global Data, Long Scope Variables, Lazy Elements, Long Switch, Paragraph of Code, Function Count, Brain Class.
 
-## Supported Languages
+## Language-Aware Analysis
 
-Go, Python, JavaScript, TypeScript, Java, C#, PHP, Rust, Ruby, Swift, Kotlin, C/C++ — all with full 20-detector coverage.
+Detectors use the language model, not one Go-shaped heuristic:
+
+| Analysis | Languages and signal |
+|---|---|
+| Full structural detectors | Go, Python, JavaScript/TypeScript, Java, C#, Kotlin, Swift, Rust, Ruby, C/C++ |
+| Function detection | Braces for C-like languages, indentation for Python, `def`/`end` for Ruby, expression bodies for C# |
+| Cohesion | Shared types in typed languages; module symbols, `this.*` and class membership for JS/TS; `self.*` for Python; `@ivar` for Ruby |
+| Nesting and bumps | Brace depth for C-like languages; indentation for Python; JS strings, template literals and comments are stripped first |
+| Parameters and complexity | Language signatures, `and`/`or`/`elif`, `guard`, `when`, `match`, `=>` and `->` |
+| Comments and switches | Python docstrings, HTML/SQL/Ruby comments; Kotlin/Rust/Ruby/Python switch forms |
+
+PHP, Scala, shell and Terraform are detected and reported accurately, with line-level detectors and best-effort language constructs. They do not yet have every language-specific rule.
+
+## Data and Markup
+
+JSON, TOML, XML, YAML, properties/INI/ENV are scanned for secrets and vulnerabilities but skipped by structural code-quality detectors. HTML and CSS get comment analysis; tag and selector nesting are not measured.
+
+## Why Scores Move
+
+A file can score lower after upgrading AILINTER because a detector now sees an issue that the old language model missed. A drop is not automatically a regression: check the new smell and the refactoring strategy before treating it as one. False positives are reported as bugs, not worked around in the score.

@@ -1,6 +1,6 @@
 # Installation
 
-AILINTER v1.0.0 is a single 30 MB Go binary with zero runtime dependencies. Install it on macOS, Linux, or Windows — or install the VS Code extension for inline editor integration.
+AILINTER v1.1.0 is a single 30 MB Go binary with zero runtime dependencies. Install it on macOS, Linux, or Windows — or install the VS Code extension for inline editor integration.
 
 ---
 
@@ -16,7 +16,7 @@ brew install ailinter/ailinter/ailinter
 Verify:
 ```bash
 ailinter version
-# → ailinter v1.0.0 (30 MB, zero dependencies)
+# → ailinter v1.1.0 (30 MB, zero dependencies)
 ```
 
 ## Linux (amd64 / arm64)
