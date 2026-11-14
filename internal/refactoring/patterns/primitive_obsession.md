@@ -3,6 +3,11 @@
 ## What
 Using primitive types (string, int, float) to represent domain concepts that deserve their own types. For example, using `string` for an email address or `float64` for money.
 
+## Language Notes
+- Primitive obsession is only counted in typed languages: Go, Java, C#, Kotlin, Swift, Rust, C/C++ and TypeScript.
+- JavaScript, Python, Ruby and PHP are skipped because they have no declared parameter types to inspect.
+- `String`/`string` parameters count as primitive values in the current detector; a Parameter Object or a domain type is the fix.
+
 ## Why It's Harmful
 - **No validation**: A `string email` can hold any string. An `Email` type validates on construction.
 - **No behavior**: A `float64 price` can't format itself. A `Money` type can.

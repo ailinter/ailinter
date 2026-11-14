@@ -1,0 +1,6 @@
+package main
+
+type Receiver struct{}
+
+func (r *Receiver) call(a, b, c, d, e, f int) {
+}

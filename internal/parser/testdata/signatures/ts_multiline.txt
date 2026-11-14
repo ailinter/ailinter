@@ -1,0 +1,9 @@
+function call(
+  a: string,
+  b: string,
+  c: string,
+  d: string,
+  e: string,
+) {
+  return a;
+}

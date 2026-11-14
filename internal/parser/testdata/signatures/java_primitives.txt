@@ -1,0 +1,4 @@
+public class Many {
+    public void call(int a, int b, int c, int d) {
+    }
+}

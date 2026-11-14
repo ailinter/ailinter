@@ -317,3 +317,62 @@ func extractVarDecl(line string) string {
 	}
 	return ""
 }
+
+// DetectPrimitiveObsessionFor counts primitive-typed parameters in typed languages. Untyped
+// languages (JavaScript, Python, Ruby, PHP) have no primitive type declarations to count.
+func DetectPrimitiveObsessionFor(lang string, lines []string) []Smell {
+	if !isTypedLanguage(lang) {
+		return nil
+	}
+	var smells []Smell
+	for i := 0; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed == "" || isComment(trimmed) || !isSignatureLine(lang, trimmed) {
+			continue
+		}
+		startLine := i + 1
+		params, end := signatureParams(lang, lines, i)
+		i = end
+		primCount := countPrimitiveTypes(params)
+		if primCount < 4 {
+			continue
+		}
+		smells = append(smells, Smell{
+			Name: "primitive_obsession", Severity: "warning",
+			LineStart: startLine, LineEnd: startLine,
+			Message:  fmt.Sprintf("Primitive obsession: %d primitive-type parameters at line %d", primCount, startLine),
+			AIPrompt: fmt.Sprintf("NOTE: %d primitive-type parameters at line %d. Consider introducing Value Objects.", primCount, startLine),
+		})
+	}
+	return smells
+}
+
+var primitiveTypeNames = map[string]bool{
+	"string": true, "int": true, "float64": true, "float32": true, "bool": true,
+	"boolean": true, "byte": true, "rune": true, "uint": true, "int64": true,
+	"int32": true, "short": true, "long": true, "double": true, "char": true,
+	"number": true, "float": true,
+}
+
+func isTypedLanguage(lang string) bool {
+	switch lang {
+	case "python", "ruby", "javascript", "php":
+		return false
+	default:
+		return true
+	}
+}
+
+func countPrimitiveTypes(params string) int {
+	count := 0
+	for _, word := range strings.FieldsFunc(strings.ToLower(params), isIdentifierBreak) {
+		if primitiveTypeNames[word] {
+			count++
+		}
+	}
+	return count
+}
+
+func isIdentifierBreak(r rune) bool {
+	return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '_')
+}
