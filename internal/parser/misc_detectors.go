@@ -152,33 +152,11 @@ func DetectExcessiveComments(lines []string, ratioThreshold float64) *Smell {
 	}
 }
 
-// DetectGlobalData flags file-level mutable variable declarations outside functions.
-func DetectGlobalData(lines []string, minGlobals int) *Smell {
-	globalCount := 0
-	inFunction := false
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || isComment(trimmed) {
-			continue
-		}
-		if strings.Contains(trimmed, "func ") || strings.HasPrefix(trimmed, "def ") ||
-			strings.HasPrefix(trimmed, "class ") {
-			inFunction = true
-			continue
-		}
-		if trimmed == "}" || (inFunction && trimmed == "") {
-			inFunction = false
-			continue
-		}
-		if inFunction {
-			continue
-		}
-		lower := strings.ToLower(trimmed)
-		if strings.HasPrefix(lower, "var ") || strings.HasPrefix(lower, "const ") ||
-			(strings.Contains(lower, " = ") && !strings.Contains(lower, "func") && !strings.Contains(lower, "import") && !strings.Contains(lower, "package")) {
-			globalCount++
-		}
-	}
+// DetectGlobalData flags file-level mutable variable declarations outside functions. It uses the
+// detected function ranges rather than guessing from braces, so indented JS/C#/Java methods and
+// brace-less Python functions are scoped correctly.
+func DetectGlobalData(lines []string, bloats []FunctionBloat, minGlobals int) *Smell {
+	globalCount := countGlobalData(lines, insideFunctionLines(bloats, len(lines)))
 	if globalCount < minGlobals {
 		return nil
 	}
@@ -189,6 +167,67 @@ func DetectGlobalData(lines []string, minGlobals int) *Smell {
 		AIPrompt: fmt.Sprintf("NOTE: %d top-level mutable variable declarations detected. Consider encapsulating global state in structs, using dependency injection, or making globals immutable.",
 			globalCount),
 	}
+}
+
+func countGlobalData(lines []string, inside []bool) int {
+	count := 0
+	for i, line := range lines {
+		if isGlobalCandidate(inside, i, line) {
+			count++
+		}
+	}
+	return count
+}
+
+func isGlobalCandidate(inside []bool, index int, line string) bool {
+	if index < len(inside) && inside[index] {
+		return false
+	}
+	return isGlobalDeclaration(line)
+}
+
+var declarationKeywords = map[string]bool{
+	"func": true, "def": true, "class": true, "interface": true, "enum": true,
+	"import": true, "package": true, "export": true, "from": true,
+}
+
+// isGlobalDeclaration recognises a top-level mutable declaration without counting function,
+// class, import or expression-bodied lines.
+func isGlobalDeclaration(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" || isComment(trimmed) {
+		return false
+	}
+	lower := strings.ToLower(trimmed)
+	first := strings.Fields(lower)[0]
+	if declarationKeywords[first] {
+		return false
+	}
+	if strings.Contains(lower, "=>") || strings.Contains(lower, "module.exports") {
+		return false
+	}
+	if first == "var" || first == "let" || first == "const" || first == "global" {
+		return true
+	}
+	return isAssignment(trimmed)
+}
+
+// isAssignment finds a plain `=` that is not a comparison or a compound assignment.
+func isAssignment(line string) bool {
+	index := strings.Index(line, "=")
+	if index < 0 {
+		return false
+	}
+	if index+1 < len(line) && line[index+1] == '=' {
+		return false
+	}
+	if index > 0 {
+		switch line[index-1] {
+		case '=', '!', '<', '>', '+', '-', '*', '/', '%', '&', '|', '^', ':':
+			return false
+		}
+	}
+	return true
 }
 
 // DetectLongScopeVariables flags variables declared far from their last usage.

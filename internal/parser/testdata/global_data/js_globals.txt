@@ -1,0 +1,12 @@
+const one = 1;
+let two = 2;
+var three = 3;
+const config = { retries: 3 };
+const cache = new Map();
+const queue = [];
+
+class Store {
+  setA() {
+    this.a = 1;
+  }
+}
