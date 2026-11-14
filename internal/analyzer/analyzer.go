@@ -116,7 +116,7 @@ func analyzeSource(src SourceInput, lines []string, t Thresholds) QualityResult 
 	addSmell(&smells, parser.DetectFileBloat(loc, t.FileLOCWarning, t.FileLOCAlert, t.FileLOCCritical))
 	bloats := detectFunctions(src.Lang, lines)
 	smells = append(smells, detectFunctionSmells(src.Lang, lines, bloats, t)...)
-	smells = append(smells, detectCodeLevelSmells(lines, bloats, t)...)
+	smells = append(smells, detectCodeLevelSmells(src.Lang, lines, bloats, t)...)
 
 	dupPairs := parser.DetectDuplications(bloats, lines, t.DupMinLines, t.DupMinSimilarity)
 	smells = append(smells, parser.DetectDuplicationSmells(dupPairs)...)
@@ -160,17 +160,17 @@ func detectFunctionSmells(lang string, lines []string, bloats []FunctionBloat, t
 	return smells
 }
 
-func detectCodeLevelSmells(lines []string, bloats []FunctionBloat, t Thresholds) []Smell {
+func detectCodeLevelSmells(lang string, lines []string, bloats []FunctionBloat, t Thresholds) []Smell {
 	smells := []Smell{}
 	smells = append(smells, parser.DetectComplexConditional(lines, t.ComplexCondBranchesWarn, t.ComplexCondBranchesAlert)...)
-	smells = append(smells, parser.DetectLongParameterList(lines, t.MaxArgumentsWarn, t.MaxArgumentsAlert)...)
+	smells = append(smells, parser.DetectLongParameterListFor(lang, lines, t.MaxArgumentsWarn, t.MaxArgumentsAlert)...)
 	fnCount := countReal(bloats)
 	addSmell(&smells, functionCountSmell(fnCount, t))
 	addSmell(&smells, brainClassSmell(len(lines), fnCount, t))
 	smells = append(smells, parser.DetectMessageChains(lines)...)
 	smells = append(smells, parser.DetectParagraphOfCode(lines, t.ParagraphMaxConsecutive)...)
 	smells = append(smells, parser.DetectLazyElements(bloats, t.LazyMinLines)...)
-	smells = append(smells, parser.DetectPrimitiveObsession(lines)...)
+	smells = append(smells, parser.DetectPrimitiveObsessionFor(lang, lines)...)
 	smells = append(smells, parser.DetectLongScopeVariables(lines, bloats, t.LongScopeVarLines)...)
 	smells = append(smells, parser.DetectLongSwitch(lines, t.LongSwitchWarn, t.LongSwitchAlert)...)
 	addSmell(&smells, parser.DetectExcessiveComments(lines, t.CommentRatioWarning))

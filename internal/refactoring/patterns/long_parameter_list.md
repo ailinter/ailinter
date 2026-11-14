@@ -3,6 +3,11 @@
 ## What
 A function that takes too many arguments (4+). Hard to understand, hard to call correctly, and hard to extend.
 
+## Language Notes
+- The detector recognises `func`, `def`, `function`, `fn`, `fun`, `method` and typed method signatures in Go, Python, JavaScript, TypeScript, Java, C#, Kotlin, Swift, Rust and Ruby.
+- Parameter lists spread over several lines are joined before counting.
+- Untyped JavaScript signatures are counted too; the fix is the same Parameter Object or options object.
+
 ## Why It's Harmful
 - **Cognitive load**: The caller must remember the order and meaning of many parameters.
 - **Brittle**: Adding a new parameter requires changing every call site.

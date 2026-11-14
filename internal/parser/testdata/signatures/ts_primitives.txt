@@ -1,0 +1,3 @@
+function call(a: string, b: string, c: number, d: boolean) {
+  return a;
+}

@@ -1,0 +1,3 @@
+fn call(a: &str, b: &str, c: &str, d: &str, e: &str, f: &str, g: &str, h: &str) {
+    println!("{}", a);
+}
