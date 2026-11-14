@@ -20,14 +20,67 @@ var jsPatterns = struct {
 	classDecl    *regexp.Regexp
 	varDecl      *regexp.Regexp
 	thisProp     *regexp.Regexp
-	identifier   *regexp.Regexp
 }{
 	functionDecl: regexp.MustCompile(`^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)`),
 	classDecl:    regexp.MustCompile(`^\s*(?:export\s+)?(?:default\s+)?class\s+([A-Za-z_$][\w$]*)`),
 	varDecl:      regexp.MustCompile(`^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)`),
 	thisProp:     regexp.MustCompile(`\bthis\.([A-Za-z_$][\w$]*)`),
-	identifier:   regexp.MustCompile(`[A-Za-z_$][\w$]*`),
 }
+
+var pythonPatterns = struct {
+	defDecl   *regexp.Regexp
+	classDecl *regexp.Regexp
+	assign    *regexp.Regexp
+	selfProp  *regexp.Regexp
+}{
+	defDecl:   regexp.MustCompile(`^\s*(?:async\s+)?def\s+([A-Za-z_]\w*)`),
+	classDecl: regexp.MustCompile(`^\s*class\s+([A-Za-z_]\w*)`),
+	assign:    regexp.MustCompile(`^([A-Za-z_]\w*)\s*=`),
+	selfProp:  regexp.MustCompile(`\bself\.([A-Za-z_]\w*)`),
+}
+
+var rubyPatterns = struct {
+	defDecl   *regexp.Regexp
+	classDecl *regexp.Regexp
+	constDecl *regexp.Regexp
+	ivar      *regexp.Regexp
+}{
+	defDecl:   regexp.MustCompile(`^\s*def\s+(?:self\.)?([A-Za-z_]\w*[!?=]?)`),
+	classDecl: regexp.MustCompile(`^\s*(?:class|module)\s+([A-Z]\w*)`),
+	constDecl: regexp.MustCompile(`^\s*([A-Z]\w*)\s*=`),
+	ivar:      regexp.MustCompile(`@([A-Za-z_]\w*)`),
+}
+
+type symbolRules struct {
+	moduleDecls []*regexp.Regexp
+	fieldRefs   *regexp.Regexp
+	fieldPrefix string
+}
+
+var symbolRulesByLanguage = map[string]symbolRules{
+	"javascript": {
+		moduleDecls: []*regexp.Regexp{jsPatterns.functionDecl, jsPatterns.classDecl, jsPatterns.varDecl},
+		fieldRefs:   jsPatterns.thisProp,
+		fieldPrefix: "this.",
+	},
+	"typescript": {
+		moduleDecls: []*regexp.Regexp{jsPatterns.functionDecl, jsPatterns.classDecl, jsPatterns.varDecl},
+		fieldRefs:   jsPatterns.thisProp,
+		fieldPrefix: "this.",
+	},
+	"python": {
+		moduleDecls: []*regexp.Regexp{pythonPatterns.defDecl, pythonPatterns.classDecl, pythonPatterns.assign},
+		fieldRefs:   pythonPatterns.selfProp,
+		fieldPrefix: "self.",
+	},
+	"ruby": {
+		moduleDecls: []*regexp.Regexp{rubyPatterns.defDecl, rubyPatterns.classDecl, rubyPatterns.constDecl},
+		fieldRefs:   rubyPatterns.ivar,
+		fieldPrefix: "@",
+	},
+}
+
+var identifierPattern = regexp.MustCompile(`[A-Za-z_$][\w$]*`)
 
 var typeKeywords = map[string]bool{
 	"func": true, "function": true, "def": true, "var": true, "const": true,
@@ -63,32 +116,30 @@ func AnalyzeCohesion(bloats []FunctionBloat, lines []string) CohesionResult {
 
 // AnalyzeCohesionLang picks the cohesion signal that fits the language.
 //
-// Typed languages are measured by shared types in signatures. JavaScript and TypeScript have no
-// reliable signature types, so that metric marks every function isolated and caps the score at 85
-// for any module with five or more functions. For them, cohesion is measured by shared module
-// symbols instead: top-level declarations a function references, plus the `this.*` fields its
-// methods share. A module of unrelated helpers still scores low; a class or a module built on its
-// own helpers scores high.
+// Typed languages are measured by shared types in signatures. JavaScript, TypeScript, Python and
+// Ruby have no reliable signature types, so that metric marks every function isolated and caps the
+// score at 85 for any module with five or more functions. For them, cohesion is measured by shared
+// module symbols instead: top-level declarations a function references, plus the fields its methods
+// share (`this.*`, `self.*`, or `@ivar`). A module of unrelated helpers still scores low; a class
+// or a module built on its own helpers scores high.
 func AnalyzeCohesionLang(lang string, bloats []FunctionBloat, lines []string) CohesionResult {
-	switch lang {
-	case "javascript", "typescript":
-		return analyzeSymbolCohesion(bloats, lines)
-	default:
-		return AnalyzeCohesion(bloats, lines)
+	if rules, ok := symbolRulesByLanguage[lang]; ok {
+		return analyzeSymbolCohesion(bloats, lines, rules)
 	}
+	return AnalyzeCohesion(bloats, lines)
 }
 
 // analyzeSymbolCohesion measures how many functions share a symbol with another function.
-func analyzeSymbolCohesion(bloats []FunctionBloat, lines []string) CohesionResult {
+func analyzeSymbolCohesion(bloats []FunctionBloat, lines []string, rules symbolRules) CohesionResult {
 	validFuncs := validFunctions(bloats)
 	if len(validFuncs) <= 3 {
 		return CohesionResult{TotalFuncs: len(validFuncs), CohesionScore: 1.0}
 	}
 
-	moduleNames := moduleLevelNames(validFuncs, lines)
+	moduleNames := moduleLevelNames(validFuncs, lines, rules)
 	sets := make(cohesionSets, len(validFuncs))
 	for i, fn := range validFuncs {
-		sets[i] = functionSymbols(fn, lines, moduleNames)
+		sets[i] = functionSymbols(fn, lines, moduleNames, rules)
 	}
 
 	return cohesionFromCounts(len(validFuncs), countIsolatedSets(sets), 0)
@@ -182,7 +233,7 @@ func functionBody(fn FunctionBloat, lines []string, maxLines int) string {
 
 // moduleLevelNames finds declarations outside every function: top-level functions, classes and
 // constants. These are the symbols a function can share with a sibling.
-func moduleLevelNames(bloats []FunctionBloat, lines []string) map[string]bool {
+func moduleLevelNames(bloats []FunctionBloat, lines []string, rules symbolRules) map[string]bool {
 	inside := insideFunctionLines(bloats, len(lines))
 	names := make(map[string]bool)
 	addFunctionNames(names, bloats)
@@ -190,7 +241,7 @@ func moduleLevelNames(bloats []FunctionBloat, lines []string) map[string]bool {
 		if inside[i] {
 			continue
 		}
-		addDeclaredName(names, line)
+		addDeclaredName(names, line, rules.moduleDecls)
 	}
 	return names
 }
@@ -219,8 +270,7 @@ func markFunctionRange(inside []bool, fn FunctionBloat) {
 	}
 }
 
-func addDeclaredName(names map[string]bool, line string) {
-	patterns := []*regexp.Regexp{jsPatterns.functionDecl, jsPatterns.classDecl, jsPatterns.varDecl}
+func addDeclaredName(names map[string]bool, line string, patterns []*regexp.Regexp) {
 	for _, pattern := range patterns {
 		if match := pattern.FindStringSubmatch(line); match != nil {
 			names[match[1]] = true
@@ -233,27 +283,23 @@ func isNamedFunction(name string) bool {
 }
 
 // functionSymbols collects the module declarations a function references and the fields it reads
-// or writes through `this`.
-func functionSymbols(fn FunctionBloat, lines []string, moduleNames map[string]bool) map[string]bool {
+// or writes through the language's instance-state syntax.
+func functionSymbols(fn FunctionBloat, lines []string, moduleNames map[string]bool, rules symbolRules) map[string]bool {
 	symbols := make(map[string]bool)
 	if isNamedFunction(fn.Name) {
 		symbols[fn.Name] = true
-		symbols["this."+fn.Name] = true
+		symbols[rules.fieldPrefix+fn.Name] = true
 	}
 	body := functionBody(fn, lines, 0)
-	addThisFields(symbols, body)
+	for _, match := range rules.fieldRefs.FindAllStringSubmatch(body, -1) {
+		symbols[rules.fieldPrefix+match[1]] = true
+	}
 	addModuleReferences(symbols, body, moduleNames)
 	return symbols
 }
 
-func addThisFields(symbols map[string]bool, body string) {
-	for _, match := range jsPatterns.thisProp.FindAllStringSubmatch(body, -1) {
-		symbols["this."+match[1]] = true
-	}
-}
-
 func addModuleReferences(symbols map[string]bool, body string, moduleNames map[string]bool) {
-	for _, word := range jsPatterns.identifier.FindAllString(body, -1) {
+	for _, word := range identifierPattern.FindAllString(body, -1) {
 		if moduleNames[word] {
 			symbols[word] = true
 		}

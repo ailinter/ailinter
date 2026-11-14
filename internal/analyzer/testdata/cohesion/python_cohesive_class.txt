@@ -1,0 +1,21 @@
+LIMIT = 4
+
+
+class Counter:
+    def __init__(self):
+        self.value = 0
+
+    def inc(self):
+        self.value = self.clamp(self.value + 1)
+
+    def dec(self):
+        self.value = self.clamp(self.value - 1)
+
+    def clamp(self, value):
+        return min(LIMIT, value)
+
+    def reset(self):
+        self.value = 0
+
+    def read(self):
+        return self.value

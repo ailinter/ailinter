@@ -90,3 +90,43 @@ func TestAnalyze_GoCohesionUnchanged(t *testing.T) {
 		t.Fatalf("shared *Data should keep Go cohesion high: %+v", result.Smells)
 	}
 }
+
+func TestAnalyze_PythonClassDoesNotGetLowCohesion(t *testing.T) {
+	result := analyzer.Analyze(
+		analyzer.SourceInput{FilePath: "counter.py", Source: readCohesionFixture(t, "python_cohesive_class.txt"), Lang: "python"},
+		analyzer.DefaultThresholds("python"),
+	)
+	if hasSmell(result, "low_cohesion") {
+		t.Fatalf("Python methods sharing self.value must be cohesive: %+v", result.Smells)
+	}
+}
+
+func TestAnalyze_RubyClassDoesNotGetLowCohesion(t *testing.T) {
+	result := analyzer.Analyze(
+		analyzer.SourceInput{FilePath: "counter.rb", Source: readCohesionFixture(t, "ruby_cohesive_class.txt"), Lang: "ruby"},
+		analyzer.DefaultThresholds("ruby"),
+	)
+	if hasSmell(result, "low_cohesion") {
+		t.Fatalf("Ruby methods sharing @value must be cohesive: %+v", result.Smells)
+	}
+}
+
+func TestAnalyze_PythonUnrelatedFunctionsStillGetLowCohesion(t *testing.T) {
+	result := analyzer.Analyze(
+		analyzer.SourceInput{FilePath: "helpers.py", Source: readCohesionFixture(t, "python_unrelated.txt"), Lang: "python"},
+		analyzer.DefaultThresholds("python"),
+	)
+	if !hasSmell(result, "low_cohesion") {
+		t.Fatalf("unrelated Python helpers should still be flagged: %+v", result.Smells)
+	}
+}
+
+func TestAnalyze_RubyUnrelatedFunctionsStillGetLowCohesion(t *testing.T) {
+	result := analyzer.Analyze(
+		analyzer.SourceInput{FilePath: "helpers.rb", Source: readCohesionFixture(t, "ruby_unrelated.txt"), Lang: "ruby"},
+		analyzer.DefaultThresholds("ruby"),
+	)
+	if !hasSmell(result, "low_cohesion") {
+		t.Fatalf("unrelated Ruby helpers should still be flagged: %+v", result.Smells)
+	}
+}

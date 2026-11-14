@@ -1,0 +1,27 @@
+class Counter
+  LIMIT = 4
+
+  def initialize
+    @value = 0
+  end
+
+  def inc
+    @value = clamp(@value + 1)
+  end
+
+  def dec
+    @value = clamp(@value - 1)
+  end
+
+  def clamp(value)
+    [LIMIT, value].min
+  end
+
+  def reset
+    @value = 0
+  end
+
+  def read
+    @value
+  end
+end
