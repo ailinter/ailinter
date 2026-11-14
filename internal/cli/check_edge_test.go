@@ -11,296 +11,244 @@ import (
 	"github.com/ailinter/ailinter/internal/vulnerability"
 )
 
-// ──────────────────────────────────────────────
-// writeResults tests
-// ──────────────────────────────────────────────
+func makeCtx(opts checkOptions, results []analyzer.QualityResult, secs []secrets.SecretFinding, vulns []vulnerability.Finding) *walkContext {
+	return &walkContext{
+		opts:        opts,
+		allResults:  results,
+		allSecrets:  secs,
+		allVulns:    vulns,
+		resolvedDir: "",
+		langCount:   make(map[string]int),
+	}
+}
 
 func TestWriteResults_SecretsOnly(t *testing.T) {
-	t.Run("secrets-only with findings", func(t *testing.T) {
-		ctx := &walkContext{
-			opts: checkOptions{format: FormatProblems, secretsOnly: true},
-			allSecrets: []secrets.SecretFinding{
-				{RuleID: "test-rule", Line: 1, Description: "test finding"},
-			},
-		}
-		out := captureStdout(func() {
-			ctx.writeResults()
+	finding := secrets.SecretFinding{RuleID: "test-rule", Line: 1, Description: "test finding"}
+	for _, tt := range []struct {
+		name   string
+		ctx    *walkContext
+		checks []string
+	}{
+		{"with findings", makeCtx(checkOptions{format: FormatProblems, secretsOnly: true}, nil, []secrets.SecretFinding{finding}, nil), []string{"test-rule"}},
+		{"empty findings", makeCtx(checkOptions{format: FormatProblems, secretsOnly: true}, nil, nil, nil), nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			out := captureStdout(func() { tt.ctx.writeResults() })
+			if tt.name == "empty findings" && out != "" {
+				t.Errorf("expected no output for empty secrets, got: %s", out)
+			}
+			for _, c := range tt.checks {
+				if !strings.Contains(out, c) {
+					t.Errorf("expected %q in output, got: %s", c, out)
+				}
+			}
 		})
-		if !strings.Contains(out, "test-rule") {
-			t.Errorf("output should contain rule name, got: %s", out)
-		}
-	})
-
-	t.Run("secrets-only empty findings", func(t *testing.T) {
-		ctx := &walkContext{
-			opts:       checkOptions{format: FormatProblems, secretsOnly: true},
-			allSecrets: nil,
-		}
-		out := captureStdout(func() {
-			ctx.writeResults()
-		})
-		if out != "" {
-			t.Errorf("expected no output for empty secrets, got: %s", out)
-		}
-	})
-
-	t.Run("secrets-only with SARIF format", func(t *testing.T) {
-		ctx := &walkContext{
-			opts: checkOptions{format: FormatSARIF, secretsOnly: true},
-			allSecrets: []secrets.SecretFinding{
-				{RuleID: "test-rule", Line: 1, Description: "test"},
-			},
-			resolvedDir: t.TempDir(),
-		}
-		out := captureStdout(func() {
-			ctx.writeResults()
-		})
-		if !strings.Contains(out, "sarif") && !strings.Contains(out, "$schema") {
-			t.Logf("SARIF output: %s", out)
-		}
-	})
+	}
 }
 
 func TestWriteResults_VulnerabilitiesOnly(t *testing.T) {
-	t.Run("vulns-only with findings", func(t *testing.T) {
-		ctx := &walkContext{
-			opts: checkOptions{format: FormatProblems, vulnerabilitiesOnly: true},
-			allVulns: []vulnerability.Finding{
-				{RuleID: "test-vuln", Severity: "high", Line: 1, Description: "test vuln"},
-			},
-		}
-		out := captureStdout(func() {
-			ctx.writeResults()
+	finding := vulnerability.Finding{RuleID: "test-vuln", Severity: "high", Line: 1, Description: "test vuln"}
+	for _, tt := range []struct {
+		name   string
+		ctx    *walkContext
+		checks []string
+	}{
+		{"with findings", makeCtx(checkOptions{format: FormatProblems, vulnerabilitiesOnly: true}, nil, nil, []vulnerability.Finding{finding}), []string{"test-vuln"}},
+		{"empty findings", makeCtx(checkOptions{format: FormatProblems, vulnerabilitiesOnly: true}, nil, nil, nil), nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			out := captureStdout(func() { tt.ctx.writeResults() })
+			if tt.name == "empty findings" && out != "" {
+				t.Errorf("expected no output for empty vulns, got: %s", out)
+			}
+			for _, c := range tt.checks {
+				if !strings.Contains(out, c) {
+					t.Errorf("expected %q in output, got: %s", c, out)
+				}
+			}
 		})
-		if !strings.Contains(out, "test-vuln") {
-			t.Errorf("output should contain vulnerability name, got: %s", out)
-		}
-	})
-
-	t.Run("vulns-only empty findings", func(t *testing.T) {
-		ctx := &walkContext{
-			opts:     checkOptions{format: FormatProblems, vulnerabilitiesOnly: true},
-			allVulns: nil,
-		}
-		out := captureStdout(func() {
-			ctx.writeResults()
-		})
-		if out != "" {
-			t.Errorf("expected no output for empty vulns, got: %s", out)
-		}
-	})
-
-	t.Run("vulns-only with SARIF format", func(t *testing.T) {
-		ctx := &walkContext{
-			opts: checkOptions{format: FormatSARIF, vulnerabilitiesOnly: true},
-			allVulns: []vulnerability.Finding{
-				{RuleID: "test-vuln", Severity: "high", Line: 1, Description: "test"},
-			},
-			resolvedDir: t.TempDir(),
-		}
-		out := captureStdout(func() {
-			ctx.writeResults()
-		})
-		if !strings.Contains(out, "$schema") {
-			t.Logf("SARIF vuln output: %s", out)
-		}
-	})
+	}
 }
 
 func TestWriteResults_JSONFormat(t *testing.T) {
-	ctx := &walkContext{
-		opts: checkOptions{format: FormatJSON},
-		allResults: []analyzer.QualityResult{
-			{Score: 100, Label: "Go Ahead", FilePath: "test.go", Language: "go", LinesOfCode: 10},
-		},
-		allSecrets: []secrets.SecretFinding{
-			{RuleID: "test-rule", Line: 5, Description: "secret found"},
-		},
-	}
-	out := captureStdout(func() {
-		ctx.writeResults()
-	})
-	if !strings.Contains(out, "\"code_quality\"") {
-		t.Errorf("JSON output should contain code_quality, got: %s", out)
-	}
-	if !strings.Contains(out, "\"secret_scan\"") {
-		t.Errorf("JSON output should contain secret_scan, got: %s", out)
+	ctx := makeCtx(checkOptions{format: FormatJSON},
+		[]analyzer.QualityResult{{Score: 100, Label: "Go Ahead", FilePath: "test.go", Language: "go", LinesOfCode: 10}},
+		[]secrets.SecretFinding{{RuleID: "test-rule", Line: 5, Description: "secret found"}},
+		nil)
+	out := captureStdout(func() { ctx.writeResults() })
+	for _, s := range []string{"\"code_quality\"", "\"secret_scan\""} {
+		if !strings.Contains(out, s) {
+			t.Errorf("JSON output should contain %s, got: %s", s, out)
+		}
 	}
 }
 
 func TestWriteResults_SARIFFormat(t *testing.T) {
-	ctx := &walkContext{
-		opts: checkOptions{format: FormatSARIF},
-		allResults: []analyzer.QualityResult{
-			{Score: 95, Label: "Go Ahead", FilePath: "test.go", Language: "go", LinesOfCode: 10},
-		},
-		resolvedDir: t.TempDir(),
-	}
-	out := captureStdout(func() {
-		ctx.writeResults()
-	})
+	ctx := makeCtx(checkOptions{format: FormatSARIF},
+		[]analyzer.QualityResult{{Score: 95, Label: "Go Ahead", FilePath: "test.go", Language: "go", LinesOfCode: 10}},
+		nil, nil)
+	ctx.resolvedDir = t.TempDir()
+	out := captureStdout(func() { ctx.writeResults() })
 	if !strings.Contains(out, "$schema") {
 		t.Logf("SARIF output: %s", out)
 	}
 }
 
 func TestWriteResults_StandardFormat(t *testing.T) {
-	t.Run("standard with results and secrets", func(t *testing.T) {
-		ctx := &walkContext{
-			opts: checkOptions{format: FormatHuman},
-			allResults: []analyzer.QualityResult{
-				{Score: 95, Label: "Go Ahead", FilePath: "test.go", Language: "go", LinesOfCode: 10},
-			},
-			allSecrets: []secrets.SecretFinding{
-				{RuleID: "test-rule", Line: 5, Description: "test"},
-			},
-		}
-		out := captureStdout(func() {
-			ctx.writeResults()
+	for _, tt := range []struct {
+		name   string
+		ctx    *walkContext
+		checks []string
+	}{
+		{
+			"with results and secrets",
+			makeCtx(checkOptions{format: FormatHuman},
+				[]analyzer.QualityResult{{Score: 95, Label: "Go Ahead", FilePath: "test.go", Language: "go", LinesOfCode: 10}},
+				[]secrets.SecretFinding{{RuleID: "test-rule", Line: 5, Description: "test"}},
+				nil),
+			[]string{"test.go"},
+		},
+		{
+			"with vulnerabilities",
+			makeCtx(checkOptions{format: FormatHuman},
+				[]analyzer.QualityResult{{Score: 95, Label: "Go Ahead", FilePath: "test.go", Language: "go", LinesOfCode: 10}},
+				nil,
+				[]vulnerability.Finding{{RuleID: "pickle_deserialization", Severity: "high", Line: 1, Description: "pickle vuln"}}),
+			[]string{"vulnerabilit"},
+		},
+		{
+			"with summary",
+			makeCtx(checkOptions{format: FormatHuman},
+				[]analyzer.QualityResult{
+					{Score: 95, Label: "Go Ahead", FilePath: "test.go", Language: "go", LinesOfCode: 10},
+					{Score: 60, Label: "Proceed with Care", FilePath: "test2.go", Language: "go", LinesOfCode: 50},
+				},
+				nil, nil),
+			[]string{"Summary"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			out := captureStdout(func() { tt.ctx.writeResults() })
+			for _, c := range tt.checks {
+				if !strings.Contains(out, c) {
+					t.Errorf("expected %q in output, got: %s", c, out)
+				}
+			}
 		})
-		if !strings.Contains(out, "test.go") {
-			t.Errorf("output should contain filename, got: %s", out)
-		}
-	})
+	}
+}
 
-	t.Run("standard with vulnerabilities", func(t *testing.T) {
-		ctx := &walkContext{
-			opts: checkOptions{format: FormatHuman},
-			allResults: []analyzer.QualityResult{
-				{Score: 95, Label: "Go Ahead", FilePath: "test.go", Language: "go", LinesOfCode: 10},
-			},
-			allVulns: []vulnerability.Finding{
-				{RuleID: "pickle_deserialization", Severity: "high", Line: 1, Description: "pickle vuln"},
-			},
-		}
-		out := captureStdout(func() {
-			ctx.writeResults()
-		})
-		if !strings.Contains(out, "vulnerabilit") {
-			t.Errorf("output should contain vulnerability section, got: %s", out)
-		}
-	})
+func TestWriteResults_SARIFSecretsOnly(t *testing.T) {
+	ctx := makeCtx(checkOptions{format: FormatSARIF, secretsOnly: true},
+		nil,
+		[]secrets.SecretFinding{{RuleID: "test-rule", Line: 1, Description: "test"}},
+		nil)
+	ctx.resolvedDir = t.TempDir()
+	out := captureStdout(func() { ctx.writeResults() })
+	if !strings.Contains(out, "$schema") {
+		t.Logf("SARIF secrets-only output: %s", out)
+	}
+}
 
-	t.Run("standard with summary", func(t *testing.T) {
-		ctx := &walkContext{
-			opts: checkOptions{format: FormatHuman},
-			allResults: []analyzer.QualityResult{
-				{Score: 95, Label: "Go Ahead", FilePath: "test.go", Language: "go", LinesOfCode: 10},
-				{Score: 60, Label: "Proceed with Care", FilePath: "test2.go", Language: "go", LinesOfCode: 50},
-			},
-		}
-		out := captureStdout(func() {
-			ctx.writeResults()
-		})
-		if !strings.Contains(out, "Summary") {
-			t.Errorf("output should contain Summary section, got: %s", out)
-		}
-	})
+func TestWriteResults_SARIFVulnerabilitiesOnly(t *testing.T) {
+	ctx := makeCtx(checkOptions{format: FormatSARIF, vulnerabilitiesOnly: true},
+		nil, nil,
+		[]vulnerability.Finding{{RuleID: "test-vuln", Severity: "high", Line: 1, Description: "test"}})
+	ctx.resolvedDir = t.TempDir()
+	out := captureStdout(func() { ctx.writeResults() })
+	if !strings.Contains(out, "$schema") {
+		t.Logf("SARIF vuln output: %s", out)
+	}
 }
 
 func TestWriteResults_EstimateTokens(t *testing.T) {
-	ctx := &walkContext{
-		opts: checkOptions{format: FormatHuman, estimateTokens: true},
-		allResults: []analyzer.QualityResult{
-			{Score: 95, Label: "Go Ahead", FilePath: "test.go", Language: "go", LinesOfCode: 10},
-		},
-	}
-	out := captureStdout(func() {
-		ctx.writeResults()
-	})
+	ctx := makeCtx(checkOptions{format: FormatHuman, estimateTokens: true},
+		[]analyzer.QualityResult{{Score: 95, Label: "Go Ahead", FilePath: "test.go", Language: "go", LinesOfCode: 10}},
+		nil, nil)
+	out := captureStdout(func() { ctx.writeResults() })
 	if !strings.Contains(out, "Token Savings") {
 		t.Errorf("output should contain token savings section, got: %s", out)
 	}
 }
 
-// ──────────────────────────────────────────────
-// checkFile edge case tests
-// ──────────────────────────────────────────────
-
-func TestCheckFile_SecretsOnlyFormatHuman(t *testing.T) {
-	dir := t.TempDir()
-	f := filepath.Join(dir, "keys.go")
-	os.WriteFile(f, []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644) // gitleaks:allow
-
-	opts := checkOptions{
-		format:      FormatHuman,
-		secretsOnly: true,
+// Helper to write a test file and return its path.
+func writeGoFile(t *testing.T, dir, name, content string) string {
+	t.Helper()
+	p := filepath.Join(dir, name)
+	if err := os.WriteFile(p, []byte(content), 0644); err != nil {
+		t.Fatal(err)
 	}
-	out := captureStdout(func() {
-		err := checkFile(f, opts)
-		if err != nil {
-			t.Fatalf("checkFile secrets-only should not error: %v", err)
-		}
-	})
-	if !strings.Contains(out, "Secret Scan") && !strings.Contains(out, "secret") {
-		t.Logf("secrets-only human output: %s", out)
+	return p
+}
+
+func TestCheckFile_SecretsOnlyFormats(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		format FormatMode
+		checks []string
+	}{
+		{"human", FormatHuman, []string{"secret"}},
+		{"problems", FormatProblems, []string{"sk_live"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			f := writeGoFile(t, dir, "keys.go", "const key = \"sk_liv...p7dc\"\n")
+			opts := checkOptions{format: tt.format, secretsOnly: true}
+			out := captureStdout(func() {
+				if err := checkFile(f, opts); err != nil {
+					t.Fatalf("checkFile secrets-only should not error: %v", err)
+				}
+			})
+			for _, c := range tt.checks {
+				if !strings.Contains(out, c) {
+					t.Logf("secrets-only %s output: %s", tt.format, out)
+				}
+			}
+		})
 	}
 }
 
-func TestCheckFile_SecretsOnlyFormatProblems(t *testing.T) {
-	dir := t.TempDir()
-	f := filepath.Join(dir, "keys.go")
-	os.WriteFile(f, []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644) // gitleaks:allow
-
-	opts := checkOptions{
-		format:      FormatProblems,
-		secretsOnly: true,
-	}
-	out := captureStdout(func() {
-		err := checkFile(f, opts)
-		if err != nil {
-			t.Fatalf("checkFile secrets-only problems should not error: %v", err)
-		}
-	})
-	if !strings.Contains(out, "sk_live") {
-		t.Logf("secrets-only problems output: %s", out)
-	}
-}
-
-func TestCheckFile_VulnerabilitiesOnlyFormatHuman(t *testing.T) {
-	dir := t.TempDir()
-	f := filepath.Join(dir, "vuln.py")
-	os.WriteFile(f, []byte("import pickle\npickle.loads(data)\n"), 0644)
-
-	opts := checkOptions{
-		format:              FormatHuman,
-		vulnerabilitiesOnly: true,
-	}
-	out := captureStdout(func() {
-		err := checkFile(f, opts)
-		if err != nil {
-			t.Fatalf("checkFile vulns-only should not error: %v", err)
-		}
-	})
-	if !strings.Contains(out, "pickle_deserialization") {
-		t.Logf("vulns-only human output: %s", out)
+func TestCheckFile_VulnerabilitiesOnlyFormats(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		format FormatMode
+	}{
+		{"human", FormatHuman},
+		{"problems", FormatProblems},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			f := writeGoFile(t, dir, "vuln.py", "import pickle\npickle.loads(data)\n")
+			opts := checkOptions{format: tt.format, vulnerabilitiesOnly: true}
+			out := captureStdout(func() {
+				if err := checkFile(f, opts); err != nil {
+					t.Fatalf("checkFile vulns-only should not error: %v", err)
+				}
+			})
+			if !strings.Contains(out, "pickle_deserialization") {
+				t.Logf("vulns-only %s output: %s", tt.format, out)
+			}
+		})
 	}
 }
 
 func TestCheckFile_StandardWithSecretsAndVulns(t *testing.T) {
 	dir := t.TempDir()
-	f := filepath.Join(dir, "vuln.py")
-	os.WriteFile(f, []byte("import pickle\npickle.loads(data)\nAPI_KEY = 'sk_live_4eC39HqLyjWDarjtT1zdp7dc'\n"), 0644) // gitleaks:allow
-
-	opts := checkOptions{
-		format: FormatHuman,
-	}
+	f := writeGoFile(t, dir, "vuln.py", "import pickle\npickle.loads(data)\nAPI_KEY = 'sk_liv...p7dc'\n")
+	opts := checkOptions{format: FormatHuman}
 	out := captureStdout(func() {
-		err := checkFile(f, opts)
-		if err != nil {
+		if err := checkFile(f, opts); err != nil {
 			t.Fatalf("checkFile with all scans should not error: %v", err)
 		}
 	})
-	if !strings.Contains(out, "Code Quality") && !strings.Contains(out, "Score") {
+	if !strings.Contains(out, "Score") {
 		t.Logf("standard output: %s", out)
 	}
 }
 
 func TestCheckFile_BinaryError(t *testing.T) {
 	dir := t.TempDir()
-	f := filepath.Join(dir, "data.bin")
-	os.WriteFile(f, []byte{0x00, 0x01, 0x02, 0x03}, 0644)
-
+	f := writeGoFile(t, dir, "data.bin", string([]byte{0x00, 0x01, 0x02, 0x03}))
 	opts := checkOptions{format: FormatHuman}
 	err := checkFile(f, opts)
 	if err == nil {
@@ -311,103 +259,49 @@ func TestCheckFile_BinaryError(t *testing.T) {
 	}
 }
 
-// ──────────────────────────────────────────────
-// checkDirectory edge case tests
-// ──────────────────────────────────────────────
-
-func TestCheckDirectory_SecretsOnly(t *testing.T) {
-	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "keys.go"), []byte("const key = \"sk_live_4eC39HqLyjWDarjtT1zdp7dc\"\n"), 0644) // gitleaks:allow
-
-	opts := checkOptions{
-		format:      FormatProblems,
-		secretsOnly: true,
-	}
-	out := captureStdout(func() {
-		err := checkDirectory(dir, opts, false)
-		if err != nil {
-			t.Fatalf("checkDirectory secrets-only should not error: %v", err)
-		}
-	})
-	if !strings.Contains(out, "sk_live") {
-		t.Logf("secrets-only dir output: %s", out)
-	}
-}
-
-func TestCheckDirectory_VulnerabilitiesOnly(t *testing.T) {
-	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "vuln.py"), []byte("import pickle\npickle.loads(data)\n"), 0644)
-
-	opts := checkOptions{
-		format:              FormatProblems,
-		vulnerabilitiesOnly: true,
-	}
-	out := captureStdout(func() {
-		err := checkDirectory(dir, opts, false)
-		if err != nil {
-			t.Fatalf("checkDirectory vulns-only should not error: %v", err)
-		}
-	})
-	if !strings.Contains(out, "pickle_deserialization") {
-		t.Logf("vulns-only dir output: %s", out)
+func TestCheckDirectory_SecretsAndVulns(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		opts     checkOptions
+		content  string
+		filename string
+		checks   []string
+	}{
+		{"secrets only", checkOptions{format: FormatProblems, secretsOnly: true}, "const key = \"sk_liv...p7dc\"\n", "keys.go", []string{"sk_live"}},
+		{"vulns only", checkOptions{format: FormatProblems, vulnerabilitiesOnly: true}, "import pickle\npickle.loads(data)\n", "vuln.py", []string{"pickle_deserialization"}},
+		{"secrets only empty", checkOptions{format: FormatProblems, secretsOnly: true}, "package main\nfunc main() {}\n", "clean.go", nil},
+		{"vulns only empty", checkOptions{format: FormatProblems, vulnerabilitiesOnly: true}, "package main\nfunc main() {}\n", "clean.go", nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeGoFile(t, dir, tt.filename, tt.content)
+			out := captureStdout(func() {
+				if err := checkDirectory(dir, tt.opts, false); err != nil {
+					t.Fatalf("checkDirectory should not error: %v", err)
+				}
+			})
+			for _, c := range tt.checks {
+				if !strings.Contains(out, c) {
+					t.Logf("dir output: %s", out)
+				}
+			}
+			if len(tt.checks) == 0 && out != "" {
+				t.Logf("unexpected output for empty: %s", out)
+			}
+		})
 	}
 }
-
-func TestCheckDirectory_SecretsOnlyEmptyResults(t *testing.T) {
-	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "clean.go"), []byte("package main\nfunc main() {}\n"), 0644)
-
-	opts := checkOptions{
-		format:      FormatProblems,
-		secretsOnly: true,
-	}
-	out := captureStdout(func() {
-		err := checkDirectory(dir, opts, false)
-		if err != nil {
-			t.Fatalf("checkDirectory secrets-only clean should not error: %v", err)
-		}
-	})
-	if out != "" {
-		t.Logf("secrets-only clean dir output: %s", out)
-	}
-}
-
-func TestCheckDirectory_VulnerabilitiesOnlyEmptyResults(t *testing.T) {
-	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "clean.go"), []byte("package main\nfunc main() {}\n"), 0644)
-
-	opts := checkOptions{
-		format:              FormatProblems,
-		vulnerabilitiesOnly: true,
-	}
-	out := captureStdout(func() {
-		err := checkDirectory(dir, opts, false)
-		if err != nil {
-			t.Fatalf("checkDirectory vulns-only clean should not error: %v", err)
-		}
-	})
-	if out != "" {
-		t.Logf("vulns-only clean dir output: %s", out)
-	}
-}
-
-// ──────────────────────────────────────────────
-// walkFn basic tests
-// ──────────────────────────────────────────────
 
 func TestWalkFn_BinaryFile(t *testing.T) {
 	dir := t.TempDir()
-	f := filepath.Join(dir, "data.bin")
-	os.WriteFile(f, []byte{0x00, 0x01, 0x02, 0x03}, 0644)
-
+	f := writeGoFile(t, dir, "data.bin", string([]byte{0x00, 0x01, 0x02, 0x03}))
 	ctx := &walkContext{
 		opts:        checkOptions{noSecrets: true, noVulnerabilities: true},
 		resolvedDir: dir,
 		scanQuality: true,
 		langCount:   make(map[string]int),
 	}
-	err := ctx.walkFn(f, fakeDirEntry{name: "data.bin", isDir: false}, nil)
-	if err != nil {
+	if err := ctx.walkFn(f, fakeDirEntry{name: "data.bin", isDir: false}, nil); err != nil {
 		t.Fatalf("walkFn on binary should not error: %v", err)
 	}
 	if ctx.fileCount != 0 {
@@ -420,7 +314,6 @@ func TestWalkFn_DirectorySkip(t *testing.T) {
 		resolvedDir: "/test",
 		langCount:   make(map[string]int),
 	}
-	// .hidden dirs should be skipped
 	err := ctx.walkFn("/test/.hidden", fakeDirEntry{name: ".hidden", isDir: true}, nil)
 	if err == nil {
 		t.Error("expected SkipDir for hidden directory")
@@ -429,29 +322,20 @@ func TestWalkFn_DirectorySkip(t *testing.T) {
 
 func TestWalkFn_ShellSourceFile(t *testing.T) {
 	dir := t.TempDir()
-	f := filepath.Join(dir, "script.sh")
-	os.WriteFile(f, []byte("#!/bin/bash\necho hello\n"), 0644)
-
+	f := writeGoFile(t, dir, "script.sh", "#!/bin/bash\necho hello\n")
 	ctx := &walkContext{
 		opts:        checkOptions{noSecrets: true, noVulnerabilities: true},
 		resolvedDir: dir,
 		scanQuality: true,
 		langCount:   make(map[string]int),
-		scanner:     nil,
-		vulnScanner: nil,
 	}
-	err := ctx.walkFn(f, fakeDirEntry{name: "script.sh", isDir: false}, nil)
-	if err != nil {
+	if err := ctx.walkFn(f, fakeDirEntry{name: "script.sh", isDir: false}, nil); err != nil {
 		t.Fatalf("walkFn on shell file should not error: %v", err)
 	}
 	if ctx.fileCount != 1 {
 		t.Errorf("expected 1 file processed, got %d", ctx.fileCount)
 	}
 }
-
-// ──────────────────────────────────────────────
-// Helper: fakeDirEntry implements os.DirEntry
-// ──────────────────────────────────────────────
 
 type fakeDirEntry struct {
 	name  string

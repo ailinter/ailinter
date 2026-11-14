@@ -11,6 +11,14 @@
 
 ---
 
+## Repository Process (Mandatory)
+
+- **Canonical checkout:** `/home/hermes/ailinter`. `/home/hermes/repo/ailinter` is a legacy mirror — never build, commit, or push from it.
+- **PR-only trunk:** never commit to `main` and never push `main`. Every change → short-lived branch (`chore/…`, `fix/…`, `feat/…`) → PR → GitHub CI (coverage ≥80/70, quality ≥90, secrets-fail) + code-reviewer → merge. Local `main` must stay at `origin/main`.
+- **Hooks (enforced at the point of work):** `.git/hooks/pre-commit` → `scripts/pre-commit.sh` (vet/fmt/staticcheck/ailinter on staged Go); `.git/hooks/pre-push` → `scripts/pre-push.sh` (blocks direct main pushes + fast build/vet). Do not bypass with `--no-verify`.
+- **Ship:** `scripts/ship-release.sh <version>` — verifies clean synced main, tags, pushes the tag; `release.yml` builds the matrix, GH Release and Homebrew formula. CHANGELOG updates ride in the preceding PR.
+- **Old unpushed work is a defect:** if `git log origin/main..HEAD` shows commits or `git status` shows WIP, route it through a branch + PR the same day — never let local work age on `main`.
+
 ## Sub-Agent Delegation (Ailinter Scans)
 
 **Delegate all ailinter scanning to the `@ailinter` sub-agent.** This keeps scan output out of the main conversation context and provides consistent, parsed results.

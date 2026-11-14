@@ -63,3 +63,5 @@ opencode.json
 
 # Wrangler cache
 .wrangler/
+.ailinter-knowledge/
+.serena/
