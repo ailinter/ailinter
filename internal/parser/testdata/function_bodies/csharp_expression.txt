@@ -1,0 +1,28 @@
+public class Many {
+    public int M01() => 1;
+    public int M02() => 2;
+    public int M03() => 3;
+    public int M04() => 4;
+    public int M05() => 5;
+    public int M06() => 6;
+    public int M07() => 7;
+    public int M08() => 8;
+    public int M09() => 9;
+    public int M10() => 10;
+    public int M11() => 11;
+    public int M12() => 12;
+    public int M13() => 13;
+    public int M14() => 14;
+    public int M15() => 15;
+    public int M16() => 16;
+    public int M17() => 17;
+    public int M18() => 18;
+    public int M19() => 19;
+    public int M20() => 20;
+    public int M21() => 21;
+    public int M22() => 22;
+    public int M23() => 23;
+    public int M24() => 24;
+    public int M25() => 25;
+    public int M26() => 26;
+}

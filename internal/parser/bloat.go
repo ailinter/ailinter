@@ -26,9 +26,10 @@ func DetectFileBloat(totalLoc int, warningThreshold int, alertThreshold int, cri
 
 // FunctionBloat holds per-function length information.
 type FunctionBloat struct {
-	Name      string
-	LineCount int
-	LineStart int
+	Name           string
+	LineCount      int
+	LineStart      int
+	ExpressionBody bool
 }
 
 // DetectBrainMethodSmell checks function lengths against thresholds.

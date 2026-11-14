@@ -189,7 +189,7 @@ var functionDetectors = map[string]langDetector{
 	"c++":        parser.DetectFunctionBloatsCPP,
 	"cc":         parser.DetectFunctionBloatsCPP,
 	"java":       parser.DetectFunctionBloatsJava,
-	"csharp":     parser.DetectFunctionBloatsJava,
+	"csharp":     parser.DetectFunctionBloatsCSharp,
 	"cs":         parser.DetectFunctionBloatsJava,
 	"rust":       parser.DetectFunctionBloatsRust,
 	"ruby":       parser.DetectFunctionBloatsRuby,
@@ -340,7 +340,10 @@ func cyclomaticComplexity(lines []string) int {
 }
 
 func isRealFunction(b FunctionBloat) bool {
-	return b.Name != "unknown" && b.Name != "anonymous" && b.LineCount >= 3
+	if b.Name == "unknown" || b.Name == "anonymous" {
+		return false
+	}
+	return b.ExpressionBody || b.LineCount >= 3
 }
 
 func countReal(bloats []FunctionBloat) int {

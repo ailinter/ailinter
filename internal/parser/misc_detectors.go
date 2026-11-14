@@ -63,7 +63,7 @@ func DetectPrimitiveObsession(lines []string) []Smell {
 func DetectLazyElements(bloats []FunctionBloat, minLines int) []Smell {
 	var smells []Smell
 	for _, b := range bloats {
-		if b.Name == "unknown" || b.Name == "anonymous" {
+		if b.Name == "unknown" || b.Name == "anonymous" || b.ExpressionBody {
 			continue
 		}
 		if b.LineCount < minLines && b.LineCount > 0 {
